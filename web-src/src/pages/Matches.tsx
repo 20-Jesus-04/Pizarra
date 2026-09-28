@@ -70,27 +70,33 @@ function Row({ p, delay = 0 }: { p: any; delay?: number }) {
   const team = (name: string, prob: number, isFav: boolean) => (
     <div className="flex min-w-0 items-center gap-3">
       <Badge name={name} size={30} />
-      <span className={`truncate font-semibold ${isFav ? "text-chalk" : "text-chalk-2"}`}>{name}</span>
-      <span className={`num ml-auto text-[13.5px] ${isFav ? "font-bold text-gold" : "text-chalk-3"}`}>{pct(prob)}</span>
+      <span className={`truncate text-[15px] font-semibold ${isFav ? "text-chalk" : "text-chalk-2"}`}>{name}</span>
+      <span className={`num ml-auto shrink-0 text-[13.5px] tabular-nums ${isFav ? "font-bold text-gold" : "text-chalk-3"}`}>{pct(prob)}</span>
     </div>
   );
+  const bar = [["1", "bg-cobalt", p.local], ["X", "bg-white/25", "Empate"], ["2", "bg-turf", p.visita]] as const;
   return (
-    <motion.a whileHover={{ scale: 1.01 }} style={{ animationDelay: `${delay}s` }}
-      href={`#p.${p.id}`} className="row-in card groupgrid grid-cols-[56px_minmax(0,1fr)_16px] items-center gap-4 px-4 py-3.5 transition-colors hover:border-gold/40 md:grid-cols-[72px_minmax(0,1fr)_minmax(0,300px)_16px]">
-      <div>
+    <motion.a whileHover={{ y: -2 }} style={{ animationDelay: `${delay}s` }} href={`#p.${p.id}`}
+      className="row-in card group grid grid-cols-[56px_minmax(0,1fr)_16px] items-center gap-x-4 gap-y-3 px-4 py-4 transition-colors hover:border-gold/40 md:grid-cols-[76px_minmax(0,1fr)_minmax(0,280px)_16px] md:gap-x-5 md:px-5">
+      <div className="self-start pt-1">
         {live ? <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-flare"><span className="live-dot h-2 w-2 rounded-full bg-flare" />EN VIVO</span>
-          : <div className="num text-[15px] font-semibold">{fTime(p.fecha)}</div>}
-        <div className="truncate text-[11px] font-semibold text-chalk-3">{compName(p)}</div>
+          : <div className="num text-[16px] font-semibold leading-none text-chalk">{fTime(p.fecha)}</div>}
+        <div className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-tight text-chalk-3">{compName(p)}</div>
       </div>
-      <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex min-w-0 flex-col gap-2">
         {team(p.local, x["1"], x["1"] >= x["2"] && x["1"] >= 0.45)}
         {team(p.visita, x["2"], x["2"] > x["1"] && x["2"] >= 0.45)}
+        <div className="mt-0.5 flex h-1 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+          {bar.map(([key, color, label]) => (
+            <span key={key} className={`h-full rounded-full ${color}`} style={{ width: `${x[key] * 100}%` }} title={`${label} ${pct(x[key])}`} />
+          ))}
+        </div>
       </div>
-      <div className="col-start-2 flex flex-col items-start gap-1.5 md:col-start-auto">
-        <span className={`tag ${k?.valor ? "bg-gold-soft text-gold" : fav.kind === "fav" ? "bg-cobalt-soft text-cobalt" : "bg-white/5 text-chalk-3"}`}>{k?.valor ? "Con valor" : fav.t}</span>
-        {k && <span className="text-[13px] leading-snug text-chalk-2">{k.sel} · <b className="num text-chalk">{pct(k.prob)}</b></span>}
+      <div className="col-span-3 col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-white/[0.06] pt-3 md:col-span-1 md:col-start-3 md:row-start-1 md:flex-col md:flex-nowrap md:items-start md:border-l md:border-t-0 md:py-1 md:pl-5 md:pt-1">
+        <span className={`tag shrink-0 ${k?.valor ? "bg-gold-soft text-gold" : fav.kind === "fav" ? "bg-cobalt-soft text-cobalt" : "bg-white/5 text-chalk-3"}`}>{k?.valor ? "Con valor" : fav.t}</span>
+        {k && <span className="min-w-0 text-[13.5px] leading-snug text-chalk-2">{k.sel} · <b className="num text-chalk">{pct(k.prob)}</b></span>}
       </div>
-      <ChevronRight className="row-span-1 h-4 w-4 text-chalk-3 transition-transform group-hover:translate-x-1 md:col-start-4 md:row-start-1 col-start-3 row-start-1" />
+      <ChevronRight className="col-start-3 row-start-1 h-4 w-4 justify-self-end text-chalk-3 transition-transform group-hover:translate-x-1 md:col-start-4" />
     </motion.a>
   );
 }
