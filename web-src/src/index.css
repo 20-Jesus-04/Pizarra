@@ -38,4 +38,9 @@
 .marquee:hover { animation-play-state: paused; }
 @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1) } 50% { opacity: .35; transform: scale(.7) } }
 .live-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .marquee, .live-dot { animation: none !important; } .shine::after { display: none; } }
+/* Entrada de página y filas: solo desplazamiento, nunca opacidad 0, para que el contenido
+   no quede invisible si el navegador pausa las animaciones (pestaña en segundo plano, ahorro de batería…). */
+@keyframes pz-in { from { transform: translateY(12px) } }
+.page-in { animation: pz-in .35s cubic-bezier(.22,1,.36,1) both; }
+.row-in { animation: pz-in .4s cubic-bezier(.22,1,.36,1) both; }
+@media (prefers-reduced-motion: reduce) { .marquee, .live-dot, .page-in, .row-in { animation: none !important; } .shine::after { display: none; } }

@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { ChevronRight, Search } from "lucide-react";
 import { DATA, DATA_AGE_H, LG, MATCHES, compName, dayKey, dayLabel, dayShort, fTime, favLabel, isLive, longDate, pct, picksFor } from "@/lib/data";
-import { Badge, ease } from "@/components/ui-pz";
+import { Badge } from "@/components/ui-pz";
 
 export default function Matches({ lg }: { lg: string | null }) {
   const list = useMemo(() => MATCHES.filter((p) => !lg || p.liga === lg), [lg]);
@@ -56,18 +56,15 @@ export default function Matches({ lg }: { lg: string | null }) {
         {q ? `Resultados para "${q}"` : dayLabel(dsel || "")}
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div key={(q || dsel) + (lg || "")} initial="hidden" animate="show" exit={{ opacity: 0, transition: { duration: 0.15 } }}
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.035 } } }} className="flex flex-col gap-2.5 pb-10">
-          {items.length ? items.map((p) => <Row key={p.id} p={p} />) : <div className="card p-10 text-center text-chalk-3">No hay partidos para esta selección.</div>}
-        </motion.div>
-      </AnimatePresence>
+      <div key={(q || dsel) + (lg || "")} className="flex flex-col gap-2.5 pb-10">
+        {items.length ? items.map((p, i) => <Row key={p.id} p={p} delay={Math.min(i, 12) * 0.035} />) : <div className="card p-10 text-center text-chalk-3">No hay partidos para esta selección.</div>}
+      </div>
       <p className="pb-16 text-[13.5px] text-chalk-3">El porcentaje junto a cada equipo es su probabilidad de ganar. <a href="#guia" className="font-semibold text-gold hover:underline">¿Cómo se calcula?</a></p>
     </div>
   );
 }
 
-function Row({ p }: { p: any }) {
+function Row({ p, delay = 0 }: { p: any; delay?: number }) {
   const x = p.mercados["1x2"], k = picksFor(p)[0], fav = favLabel(p);
   const live = isLive(p);
   const team = (name: string, prob: number, isFav: boolean) => (
@@ -78,8 +75,8 @@ function Row({ p }: { p: any }) {
     </div>
   );
   return (
-    <motion.a variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease } } }} whileHover={{ scale: 1.01 }}
-      href={`#p.${p.id}`} className="card group grid grid-cols-[56px_minmax(0,1fr)_16px] items-center gap-4 px-4 py-3.5 transition-colors hover:border-gold/40 md:grid-cols-[72px_minmax(0,1fr)_minmax(0,300px)_16px]">
+    <motion.a whileHover={{ scale: 1.01 }} style={{ animationDelay: `${delay}s` }}
+      href={`#p.${p.id}`} className="row-in card groupgrid grid-cols-[56px_minmax(0,1fr)_16px] items-center gap-4 px-4 py-3.5 transition-colors hover:border-gold/40 md:grid-cols-[72px_minmax(0,1fr)_minmax(0,300px)_16px]">
       <div>
         {live ? <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-flare"><span className="live-dot h-2 w-2 rounded-full bg-flare" />EN VIVO</span>
           : <div className="num text-[15px] font-semibold">{fTime(p.fecha)}</div>}

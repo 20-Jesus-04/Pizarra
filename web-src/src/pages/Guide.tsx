@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { DATA } from "@/lib/data";
-import { Accordion, Reveal, Ring, ease } from "@/components/ui-pz";
+import { Accordion, Reveal, Ring } from "@/components/ui-pz";
 
 const LESSONS = [
   { k: "Probabilidad", t: "Qué tan seguido pasa", d: "Un 70% significa que, si el partido se jugara 10 veces, eso pasaría unas 7. Nunca es una garantía.", ex: <>"Más de 1.5 goles: <b>78%</b>" falla más o menos 1 de cada 5 veces.</>, p: 0.78 },
@@ -34,8 +34,7 @@ export default function Guide() {
         </div>
         <div className="card relative min-h-[300px] overflow-hidden p-8">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cobalt/15 blur-3xl" />
-          <AnimatePresence mode="wait">
-            <motion.div key={i} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.4, ease }} className="relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
+          <div key={i} className="page-in relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
               <div>
                 <span className="tag bg-cobalt-soft text-cobalt">{i + 1} · {L.k}</span>
                 <h2 className="mt-4 text-[clamp(26px,3.4vw,38px)] font-black">{L.t}</h2>
@@ -45,8 +44,7 @@ export default function Guide() {
                   : <a href="#partidos" className="mt-6 inline-block rounded-full bg-gold px-5 py-3 font-bold text-night-900">Listo, ver partidos →</a>}
               </div>
               <Ring key={i} p={L.p} size={150} stroke={11} color={i === 2 ? "#2FE0A0" : "#FFC23D"} label={<span className="num text-[30px] font-semibold">{Math.round(L.p * 100)}%</span>} />
-            </motion.div>
-          </AnimatePresence>
+          </div>
         </div>
       </div>
 

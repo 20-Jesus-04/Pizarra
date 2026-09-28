@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowLeft, Calculator, Info } from "lucide-react";
 import { BY_ID, DATA, GROUPS, MK_NAMES, allSelections, compName, dayKey, dayLabel, fTime, fair, isLive, isPlayed, keyFacts, marketRows, odd, pct, picksFor, unpack, verdict } from "@/lib/data";
 import { Accordion, Badge, FormDots, Meter, Pitch, Reveal, Ring, SectionHead, Tabs, Ticket, ease, item, stagger } from "@/components/ui-pz";
@@ -84,15 +84,13 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
       <section className="mt-14 pb-20">
         <Tabs id="det" value={tab} onChange={setTab} tabs={[["resumen", "Resumen"], ["jugadores", "Jugadores"], ["mercados", "Todos los mercados"], ["stats", "Estadísticas"], ["cuotas", "Cuotas y calculadora"]]} />
         <div id="det-panel" role="tabpanel" aria-labelledby={`det-${tab}`} className="pt-7">
-          <AnimatePresence mode="wait">
-            <motion.div key={tab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3, ease }}>
+          <div key={tab} className="page-in">
               {tab === "resumen" && <Resumen p={p} />}
               {tab === "jugadores" && <Jugadores p={p} />}
               {tab === "mercados" && <Mercados p={p} />}
               {tab === "stats" && <Stats p={p} />}
               {tab === "cuotas" && <Cuotas p={p} />}
-            </motion.div>
-          </AnimatePresence>
+          </div>
         </div>
       </section>
     </div>
@@ -295,9 +293,8 @@ function Cuotas({ p }: { p: any }) {
           <input value={o} onChange={(e) => setO(e.target.value)} inputMode="decimal" placeholder="Cuota, ej. 1.85" aria-label="Cuota de tu casa"
             className="rounded-xl border border-white/10 bg-night-850 px-3 py-3 text-[15px] text-chalk placeholder:text-chalk-3 focus:border-cobalt focus:outline-none" />
         </div>
-        <AnimatePresence mode="wait">
-          <motion.div key={ev == null ? "none" : ev > 0 ? "yes" : "no"} initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease }}
-            aria-live="polite" className={`relative mt-5 rounded-2xl p-5 ${ev == null ? "bg-white/[0.04]" : ev > 0 ? "bg-turf-soft ring-1 ring-turf/40" : "bg-flare/10 ring-1 ring-flare/30"}`}>
+          <div key={ev == null ? "none" : ev > 0 ? "yes" : "no"}
+            aria-live="polite" className={`page-in relative mt-5 rounded-2xl p-5 ${ev == null ? "bg-white/[0.04]" : ev > 0 ? "bg-turf-soft ring-1 ring-turf/40" : "bg-flare/10 ring-1 ring-flare/30"}`}>
             {ev == null ? (
               <p className="text-[15px] text-chalk-2">Cuota justa: <b className="num text-chalk">{fair(prob)}</b>. Si tu casa paga más, la apuesta tiene valor.</p>
             ) : ev > 0 ? (
@@ -308,8 +305,7 @@ function Cuotas({ p }: { p: any }) {
             ) : (
               <p className="text-[15px] leading-relaxed text-chalk-2"><b className="text-flare">Sin valor.</b> Esta cuota paga menos de lo que debería (la justa es <b className="num text-chalk">{fair(prob)}</b>). A la larga perderías <b className="num text-chalk">{(ev * -100).toFixed(1)}%</b>.</p>
             )}
-          </motion.div>
-        </AnimatePresence>
+          </div>
       </div>
       <div className="card p-6">
         <h3 className="text-[20px] font-extrabold">Cuotas publicadas</h3>

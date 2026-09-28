@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, MotionConfig, motion, useScroll, useSpring } from "framer-motion";
+import { MotionConfig, motion, useScroll, useSpring } from "framer-motion";
 import { BarChart3, CircleHelp, Home as HomeIcon, Trophy } from "lucide-react";
 import Home from "@/pages/Home";
 import Matches from "@/pages/Matches";
@@ -7,7 +7,6 @@ import Match from "@/pages/Match";
 import Leagues from "@/pages/Leagues";
 import Guide from "@/pages/Guide";
 import { BY_ID, LG } from "@/lib/data";
-import { ease } from "@/components/ui-pz";
 
 function useHash() {
   const [h, setH] = useState(() => location.hash.slice(1) || "inicio");
@@ -74,11 +73,9 @@ export default function App() {
           </div>
         </header>
 
-        <AnimatePresence mode="wait">
-          <motion.main key={hash} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, ease }} className="pb-24 md:pb-0">
-            {page}
-          </motion.main>
-        </AnimatePresence>
+        <main key={hash} className="page-in pb-24 md:pb-0">
+          {page}
+        </main>
 
         <footer className="hidden border-t border-white/[0.06] md:block">
           <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-6 px-8 py-8 text-[13px] text-chalk-3">
