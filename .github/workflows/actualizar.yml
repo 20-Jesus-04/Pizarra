@@ -1,0 +1,29 @@
+name: Actualizar pronosticos
+
+on:
+  schedule:
+    - cron: "17 11 * * *"   # todos los días 06:17 hora Lima
+    - cron: "47 16 * * 5,6" # viernes y sábado 11:47 Lima (cuotas más frescas antes del fin de semana)
+  workflow_dispatch:        # botón "Run workflow" para actualizar a mano
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python -m pronosticos.build
+      - name: Guardar la web generada
+        run: |
+          git config user.name "pronosticos-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A docs data
+          git commit -m "Actualizacion automatica $(date -u +%F)" || echo "Sin cambios"
+          git push
