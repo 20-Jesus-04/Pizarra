@@ -26,7 +26,7 @@ UA = {
     "Origin": "https://www.espn.com",
 }
 # Hosts alternativos de la API de ESPN (si uno bloquea, se prueba el siguiente).
-ESPN_HOSTS = [ESPN_BASE, ESPN_BASE.replace("site.api.espn.com", "site.web.api.espn.com")]
+ESPN_HOSTS = [ESPN_BASE.replace("site.api.espn.com", "site.web.api.espn.com"), ESPN_BASE]  # site.api bloquea a GitHub (403)
 _FAILS = {}          # host -> fallos seguidos (para no perder 15 minutos reintentando un host caído)
 _LOGGED = set()
 
