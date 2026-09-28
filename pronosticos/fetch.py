@@ -131,6 +131,9 @@ def fetch_all(verbose: bool = True) -> None:
             if r is not None and len(r.content) > 200:
                 raw["fd"][f"{code}/{lg['fd']}"] = r.content.decode("latin-1")
                 log(f"  football-data {code}/{lg['fd']}: ok")
+    r = _get(f"{FD_BASE}/fixtures.csv")
+    if r is not None and len(r.content) > 200:
+        raw["fd"]["fixtures"] = r.content.decode("utf-8-sig", errors="replace")
 
     # 2) ESPN Perú (resultados + estadísticas)
     for y in range(now.year - N_YEARS_PERU + 1, now.year + 1):
@@ -139,7 +142,7 @@ def fetch_all(verbose: bool = True) -> None:
         log(f"  ESPN Liga 1 {y}: {len(ev)} partidos")
 
     # 3) ESPN próximos partidos (todas las ligas) + resultados recientes para mapear nombres
-    prox = {"fetched": now.isoformat(), "leagues": {}}
+    prox = {"fetched": now.isoformat(), "leagues": {}, "resultados": {}}
     top5 = {}
     years = [now.year - 1, now.year] + ([now.year + 1] if now.month >= 11 else [])
     for lg in LEAGUES.values():
@@ -159,7 +162,9 @@ def fetch_all(verbose: bool = True) -> None:
             if state == "post":
                 h = next(x for x in c["competitors"] if x["homeAway"] == "home")
                 a = next(x for x in c["competitors"] if x["homeAway"] == "away")
-                done.append([e["date"], h["team"]["displayName"], a["team"]["displayName"], h.get("score"), a.get("score")])
+                done.append([e["date"], h["team"]["displayName"], a["team"]["displayName"], h.get("score"), a.get("score"), e["id"]])
+                if e["status"]["type"].get("completed") and e["date"] >= f"{now.year - 1}":
+                    prox["resultados"][e["id"]] = {"hg": _int(h.get("score")), "ag": _int(a.get("score"))}
             else:
                 up.append({
                     "id": e["id"], "date": e["date"], "state": state, "season": (e.get("season") or {}).get("slug"),
@@ -225,11 +230,49 @@ def fetch_all(verbose: bool = True) -> None:
         if o_int:
             print("::warning::ESPN selecciones: sin datos nuevos, se conservan los anteriores.")
             intl = o_int
+    prox["resultados"] = {**(old("proximos.json") or {}).get("resultados", {}), **prox["resultados"]}
+    for e in intl.get("done", []):
+        prox["resultados"].setdefault(e["id"], {"hg": _int(e.get("hs")), "ag": _int(e.get("as"))})
+    prox["arbitros"] = fetch_referees(prox, intl, now, (old("proximos.json") or {}).get("arbitros", {}))
+    log(f"  árbitros confirmados en ESPN: {len(prox['arbitros'])}")
     for name, obj in (("raw.json", raw), ("proximos.json", prox), ("espn_top5.json", top5), ("internacional.json", intl)):
         with open(os.path.join(DATA_DIR, name), "w", encoding="utf-8") as f:
             json.dump(obj, f, ensure_ascii=False)
     if _FAILS:
         print("Hosts con fallos:", {h: n for h, n in _FAILS.items() if n})
+
+
+def _int(x):
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def _referee(j: dict):
+    return next((o.get("displayName") for o in ((j.get("gameInfo") or {}).get("officials") or [])
+                 if (o.get("position") or {}).get("name") == "Referee"), None)
+
+
+def fetch_referees(prox: dict, intl: dict, now: datetime, old: dict, days: int = 4, workers: int = 8) -> dict:
+    """ESPN publica el árbitro poco antes del partido: se consulta la ficha de los partidos de los próximos días."""
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import timedelta
+    lim = (now + timedelta(days=days)).strftime("%Y-%m-%dT%H:%MZ")
+    todo = [(slug, e["id"]) for slug, evs in prox["leagues"].items() for e in evs if e["date"] <= lim]
+    todo += [(e["slug"], e["id"]) for e in intl.get("up", []) if e["date"] <= lim]
+    upcoming = {i for _, i in todo}
+    out = {k: v for k, v in old.items() if k in upcoming}
+
+    def one(t):
+        j = _espn(f"{t[0]}/summary", event=t[1])
+        return t[1], _referee(j) if j else None
+
+    with ThreadPoolExecutor(workers) as ex:
+        for eid, ref in ex.map(one, todo):
+            if ref:
+                out[eid] = ref
+    return out
 
 
 def _load_old(name):
@@ -283,10 +326,16 @@ def summarize_event(j: dict, slug: str, lg: str, eid: str, date: str) -> dict:
                             1 if p.get("starter") else 0, mins] +
                            [st.get(k, 0) for k in ("totalGoals", "goalAssists", "totalShots", "shotsOnTarget", "foulsCommitted",
                                                    "foulsSuffered", "yellowCards", "redCards", "offsides", "saves")])
-    ref = next((o.get("displayName") for o in ((j.get("gameInfo") or {}).get("officials") or [])
-                if (o.get("position") or {}).get("name") == "Referee"), None)
+    ref = _referee(j)
     comp = ((j.get("header") or {}).get("league") or {}).get("name") or slug
-    return {"id": eid, "slug": slug, "lg": lg, "comp": comp, "date": date, "ref": ref, "teams": teams, "players": players}
+    ht = None
+    comps = (((j.get("header") or {}).get("competitions") or [{}])[0]).get("competitors") or []
+    ls = {c.get("homeAway"): c.get("linescores") or [] for c in comps}
+    if ls.get("home") and ls.get("away"):
+        ht = [_int(ls["home"][0].get("displayValue")), _int(ls["away"][0].get("displayValue"))]
+    score = {c.get("homeAway"): _int(c.get("score")) for c in comps}
+    return {"id": eid, "slug": slug, "lg": lg, "comp": comp, "date": date, "ref": ref, "ht": ht,
+            "score": [score.get("home"), score.get("away")], "teams": teams, "players": players}
 
 
 def fetch_players(verbose: bool = True, workers: int = 8) -> None:

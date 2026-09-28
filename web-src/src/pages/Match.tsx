@@ -82,12 +82,13 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
 
       {/* DETALLE */}
       <section className="mt-14 pb-20">
-        <Tabs id="det" value={tab} onChange={setTab} tabs={[["resumen", "Resumen"], ["jugadores", "Jugadores"], ["mercados", "Todos los mercados"], ["stats", "Estadísticas"], ["cuotas", "Cuotas y calculadora"]]} />
+        <Tabs id="det" value={tab} onChange={setTab} tabs={[["resumen", "Resumen"], ["jugadores", "Jugadores"], ["mercados", "Todos los mercados"], ["modelos", "Modelos y árbitro"], ["stats", "Estadísticas"], ["cuotas", "Cuotas y calculadora"]]} />
         <div id="det-panel" role="tabpanel" aria-labelledby={`det-${tab}`} className="pt-7">
           <div key={tab} className="page-in">
               {tab === "resumen" && <Resumen p={p} />}
               {tab === "jugadores" && <Jugadores p={p} />}
               {tab === "mercados" && <Mercados p={p} />}
+              {tab === "modelos" && <Modelos p={p} />}
               {tab === "stats" && <Stats p={p} />}
               {tab === "cuotas" && <Cuotas p={p} />}
           </div>
@@ -125,6 +126,56 @@ function Resumen({ p }: { p: any }) {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+const AUD: Record<string, [string, string]> = { ok: ["Revisado: sin problemas", "bg-turf-soft text-turf"], revisar: ["Revisado: con avisos", "bg-gold-soft text-gold"], bloqueado: ["Bloqueado por el auditor", "bg-flare/15 text-flare"] };
+
+function Modelos({ p }: { p: any }) {
+  const N = DATA.metodologia?.nombres || {};
+  const L = p.modelos?.lista || [];
+  const x = p.mercados["1x2"], a = p.auditoria, r = p.arbitro, t = p.mercados.tarjetas;
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
+      <div className="card p-6">
+        <h3 className="text-[20px] font-extrabold">Los 6 modelos</h3>
+        <p className="mt-1 text-[13.5px] text-chalk-3">Cada uno da su 1X2; el ensamble los combina con los pesos calibrados contra partidos ya jugados.</p>
+        <div className="-mx-2 mt-4 overflow-x-auto">
+          <table className="pz">
+            <thead><tr><th>Modelo</th><th className="n">{p.local}</th><th className="n">Empate</th><th className="n">{p.visita}</th><th className="n">+2.5</th><th className="n">Peso</th></tr></thead>
+            <tbody>
+              {L.map((m: any) => (
+                <tr key={m.clave}><td>{N[m.clave] || m.clave}</td><td className="n">{pct(m["1"])}</td><td className="n">{pct(m.X)}</td><td className="n">{pct(m["2"])}</td>
+                  <td className="n">{m.o25 != null ? pct(m.o25) : "–"}</td><td className="n text-chalk-3">{pct(m.peso)}</td></tr>
+              ))}
+              <tr className="bg-gold-soft font-bold"><td className="text-gold">Ensamble</td><td className="n">{pct(x["1"])}</td><td className="n">{pct(x.X)}</td><td className="n">{pct(x["2"])}</td><td className="n">{pct(p.mercados.goles_totales["2.5"].over)}</td><td className="n">100%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        {p.modelos?.elo && <p className="mt-3 text-[13px] text-chalk-3">Elo: {p.local} {p.modelos.elo[0]} · {p.visita} {p.modelos.elo[1]}. <a href="#metodo" className="font-semibold text-gold hover:underline">Qué mide cada modelo</a></p>}
+      </div>
+      <div className="flex flex-col gap-5">
+        <div className="card p-6">
+          <h3 className="text-[20px] font-extrabold">Árbitro y tarjetas</h3>
+          {r ? (
+            <div className="mt-3 text-[14.5px] leading-relaxed text-chalk-2">
+              <div className="text-[18px] font-bold text-chalk">{r.nombre}</div>
+              {r.partidos ? <p className="mt-1">{r.partidos} partidos en los datos · {r.tarjetas_prom} amarillas por partido (se esperaban {r.esperadas_prom}).
+                Factor <b className={`num ${r.factor > 1.03 ? "text-flare" : r.factor < 0.97 ? "text-turf" : "text-chalk"}`}>×{r.factor.toFixed(2)}</b>{r.factor > 1.03 ? ": saca más tarjetas que la media." : r.factor < 0.97 ? ": saca menos tarjetas que la media." : ": en la media."}</p>
+                : <p className="mt-1">Sin partidos suyos en los datos: se usa la media de la liga.</p>}
+              {r.tarjetas_con_arbitro != null && <p className="mt-2">Amarillas esperadas: <b className="num text-chalk">{r.tarjetas_con_arbitro.toFixed(1)}</b> <span className="text-chalk-3">(sin el árbitro serían {r.tarjetas_sin_arbitro.toFixed(1)})</span></p>}
+            </div>
+          ) : <p className="mt-2 text-[14.5px] text-chalk-2">Árbitro aún sin confirmar. Las tarjetas esperadas ({t ? t.esperadas_total.toFixed(1) : "–"}) usan solo a los equipos; se ajustan solas cuando se publique la designación.</p>}
+        </div>
+        {a && (
+          <div className="card p-6">
+            <h3 className="text-[20px] font-extrabold">Auditoría automática</h3>
+            <span className={`tag mt-3 inline-block ${AUD[a.estado]?.[1]}`}>{AUD[a.estado]?.[0]}</span>
+            {a.notas?.length > 0 && <ul className="mt-3 flex list-disc flex-col gap-1.5 pl-5 text-[14px] text-chalk-2">{a.notas.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul>}
+          </div>
+        )}
       </div>
     </div>
   );

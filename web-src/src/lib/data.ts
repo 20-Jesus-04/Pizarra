@@ -125,6 +125,9 @@ export function keyFacts(p: any): string[] {
   const all = [...(p.jugadores?.local || []).map((j: any) => ({ ...unpack(j), eq: p.local })), ...(p.jugadores?.visita || []).map((j: any) => ({ ...unpack(j), eq: p.visita }))];
   const top = all.sort((a, b) => b.prob.marca - a.prob.marca)[0];
   if (top) f.push(`Con más opciones de marcar: **${top.nombre}** (${top.eq}), ${pct(top.prob.marca)}.`);
+  if (p.fijas?.length) f.push(`Está entre las **fijas** del día: pasó los cuatro filtros de acierto comprobado.`);
+  const r = p.arbitro, t = p.mercados?.tarjetas;
+  if (r?.partidos && t) f.push(`Árbitro: **${r.nombre}**, ${r.factor > 1.03 ? "saca más tarjetas que la media" : r.factor < 0.97 ? "saca menos tarjetas que la media" : "en la media de tarjetas"} (×${r.factor.toFixed(2)}). Se esperan ${t.esperadas_total.toFixed(1)} amarillas.`);
   if (p.mercado && p.desacuerdo_modelo_mercado > 0.08) f.push(`El modelo y las casas no coinciden del todo: revisa lesiones o rotaciones antes de apostar.`);
   return f;
 }

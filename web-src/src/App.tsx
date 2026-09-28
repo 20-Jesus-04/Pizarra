@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { MotionConfig, motion, useScroll, useSpring } from "framer-motion";
-import { BarChart3, CircleHelp, Home as HomeIcon, Trophy } from "lucide-react";
+import { BarChart3, BookOpen, History, Home as HomeIcon, ShieldCheck, Trophy } from "lucide-react";
 import Home from "@/pages/Home";
 import Matches from "@/pages/Matches";
 import Match from "@/pages/Match";
 import Leagues from "@/pages/Leagues";
 import Guide from "@/pages/Guide";
+import Fijas from "@/pages/Fijas";
+import Resultados from "@/pages/Resultados";
+import Metodo from "@/pages/Metodo";
 import { BY_ID, LG } from "@/lib/data";
 
 function useHash() {
@@ -17,9 +20,12 @@ function useHash() {
 const NAV = [
   ["inicio", "Inicio", HomeIcon],
   ["partidos", "Partidos", Trophy],
+  ["fijas", "Fijas", ShieldCheck],
+  ["resultados", "Resultados", History],
   ["ligas", "Ligas", BarChart3],
-  ["guia", "Cómo usarla", CircleHelp],
+  ["metodo", "Método", BookOpen],
 ] as const;
+const MOBILE = NAV.filter(([k]) => k !== "ligas");
 
 export default function App() {
   const hash = useHash();
@@ -27,13 +33,16 @@ export default function App() {
   const arg = rest.join(".") || null;
   const [lastLg, setLastLg] = useState<string | null>(null);
   useEffect(() => { if (view === "partidos") setLastLg(arg); }, [view, arg]);
-  const section = view === "p" ? "partidos" : view === "liga" ? "ligas" : ["partidos", "ligas", "guia"].includes(view) ? view : "inicio";
+  const section = view === "p" ? "partidos" : view === "liga" ? "ligas" : ["partidos", "ligas", "fijas", "resultados", "metodo"].includes(view) ? view : view === "guia" ? "metodo" : "inicio";
 
   let page, title;
   if (view === "partidos") { page = <Matches lg={arg && LG[arg] ? arg : null} />; title = "Partidos"; }
   else if (view === "p") { page = <Match id={arg || ""} backTo={`#partidos${lastLg ? "." + lastLg : ""}`} />; const m = BY_ID[arg || ""]; title = m ? `${m.local} vs ${m.visita}` : "Partido"; }
   else if (view === "ligas" || view === "liga") { const c = arg && LG[arg] ? arg : "E0"; page = <Leagues code={c} />; title = LG[c]?.name; }
   else if (view === "guia") { page = <Guide />; title = "Cómo usar Pizarra"; }
+  else if (view === "fijas") { page = <Fijas />; title = "Fijas"; }
+  else if (view === "resultados") { page = <Resultados />; title = "Resultados"; }
+  else if (view === "metodo") { page = <Metodo />; title = "Metodología"; }
   else { page = <Home />; title = "Pronósticos con datos"; }
 
   useEffect(() => {
@@ -61,35 +70,35 @@ export default function App() {
               </motion.svg>
               PIZARRA
             </a>
-            <nav className="ml-auto hidden gap-1 md:flex" aria-label="Principal">
+            <nav className="ml-auto hidden gap-0.5 lg:flex" aria-label="Principal">
               {NAV.map(([k, t]) => (
-                <a key={k} href={`#${k}`} aria-current={section === k ? "page" : undefined} className={`relative rounded-full px-4 py-2 text-[14.5px] font-semibold transition-colors ${section === k ? "text-night-900" : "text-chalk-2 hover:text-chalk"}`}>
+                <a key={k} href={`#${k}`} aria-current={section === k ? "page" : undefined} className={`relative rounded-full px-3.5 py-2 text-[14.5px] font-semibold transition-colors ${section === k ? "text-night-900" : "text-chalk-2 hover:text-chalk"}`}>
                   {section === k && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-chalk" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
                   <span className="relative">{t}</span>
                 </a>
               ))}
             </nav>
-            <a href="#partidos" className="ml-auto rounded-full bg-gold px-4 py-2 text-[14px] font-bold text-night-900 md:ml-0">Ver partidos</a>
+            <a href="#partidos" className="ml-auto rounded-full bg-gold px-4 py-2 text-[14px] font-bold text-night-900 lg:ml-0">Ver partidos</a>
           </div>
         </header>
 
-        <main key={hash} className="page-in pb-24 md:pb-0">
+        <main key={hash} className="page-in pb-24 lg:pb-0">
           {page}
         </main>
 
-        <footer className="hidden border-t border-white/[0.06] md:block">
+        <footer className="hidden border-t border-white/[0.06] lg:block">
           <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-6 px-8 py-8 text-[13px] text-chalk-3">
             <span className="font-display font-black tracking-wide text-chalk-2" style={{ fontStretch: "125%" }}>PIZARRA</span>
             <span>Probabilidades, no certezas. Apuesta con responsabilidad · +18</span>
           </div>
         </footer>
 
-        <nav className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-white/10 bg-night-850/90 px-2 pt-1.5 backdrop-blur-xl md:hidden"
+        <nav className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-white/10 bg-night-850/90 px-1 pt-1.5 backdrop-blur-xl lg:hidden"
           style={{ paddingBottom: "calc(6px + env(safe-area-inset-bottom, 0px))" }} aria-label="Principal (móvil)">
-          {NAV.map(([k, t, Icon]) => (
+          {MOBILE.map(([k, t, Icon]) => (
             <a key={k} href={`#${k}`} aria-current={section === k ? "page" : undefined} className={`relative flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-semibold ${section === k ? "text-gold" : "text-chalk-3"}`}>
               {section === k && <motion.span layoutId="bnav" className="absolute inset-0 rounded-xl bg-gold-soft" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
-              <Icon className="relative h-[22px] w-[22px]" /><span className="relative">{k === "guia" ? "Guía" : t}</span>
+              <Icon className="relative h-[22px] w-[22px]" /><span className="relative">{t}</span>
             </a>
           ))}
         </nav>

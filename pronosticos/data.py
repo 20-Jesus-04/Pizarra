@@ -108,7 +108,7 @@ def build_name_map(fd: pd.DataFrame, espn_results: list) -> dict[str, str]:
     idx = defaultdict(list)
     for r in fd[["date", "home", "away", "hg", "ag"]].itertuples(index=False):
         idx[(int(r.hg), int(r.ag))].append(r)
-    for date, h, a, hs, as_ in espn_results:
+    for date, h, a, hs, as_, *_ in espn_results:
         try:
             dt = pd.to_datetime(date).tz_localize(None).normalize()
             key = (int(hs), int(as_))
@@ -296,8 +296,20 @@ def load_all():
                 "home_espn": h["name"], "away_espn": a["name"],
                 "espn_form": {"home": h.get("form"), "away": a.get("form")},
                 "espn_record": {"home": h.get("rec"), "away": a.get("rec")},
-                "odds": odds,
+                "odds": odds, "arbitro": prox.get("arbitros", {}).get(e["id"]),
             })
+    # árbitros publicados por football-data (Inglaterra, días antes del partido)
+    fx = fixture_referees(raw["fd"].get("fixtures"))
+    for u in upcoming:
+        code_fd = LEAGUES[u["league"]]["fd"]
+        if u.get("arbitro") or not code_fd:
+            continue
+        d = pd.Timestamp(u["date"]).tz_localize(None).normalize()
+        for dd in (d, d - pd.Timedelta(days=1), d + pd.Timedelta(days=1)):
+            ref = fx.get((code_fd, dd, u["home"], u["away"]))
+            if ref:
+                u["arbitro"] = ref
+                break
     # selecciones
     ip = os.path.join(DATA_DIR, "int_results.csv")
     ie = os.path.join(DATA_DIR, "internacional.json")
@@ -314,5 +326,66 @@ def load_all():
                 "home_display": ES_NAMES.get(h["key"], h["name"]), "away_display": ES_NAMES.get(a["key"], a["name"]),
                 "home_espn": h["name"], "away_espn": a["name"],
                 "espn_form": {"home": h.get("form"), "away": a.get("form")}, "espn_record": {}, "odds": _odds_dec(e["odds"]),
+                "arbitro": prox.get("arbitros", {}).get(e["id"]),
             })
     return leagues, upcoming, prox.get("fetched")
+
+
+def fixture_referees(txt) -> dict:
+    """{(div, fecha, local, visita): árbitro} desde fixtures.csv de football-data."""
+    if not txt:
+        return {}
+    try:
+        f = pd.read_csv(io.StringIO(txt), on_bad_lines="skip")
+    except (ValueError, pd.errors.ParserError):
+        return {}
+    f.columns = [c.lstrip("﻿") for c in f.columns]
+    if not {"Div", "Date", "HomeTeam", "AwayTeam", "Referee"} <= set(f.columns):
+        return {}
+    f = f.dropna(subset=["Referee"])
+    f["d"] = pd.to_datetime(f.Date, dayfirst=True, errors="coerce")
+    return {(r.Div, r.d, r.HomeTeam.strip(), r.AwayTeam.strip()): r.Referee.strip() for r in f.itertuples() if not pd.isna(r.d)}
+
+
+def load_results() -> dict:
+    """Resultados reales por id de ESPN: marcador, descanso, córners y amarillas (para liquidar el historial)."""
+    out = {}
+    try:
+        prox = _load("proximos.json")
+    except OSError:
+        prox = {}
+    for eid, r in (prox.get("resultados") or {}).items():
+        if r.get("hg") is not None:
+            out[eid] = {"hg": r["hg"], "ag": r["ag"]}
+    try:
+        raw = _load("raw.json")
+        for evs in raw.get("espn", {}).values():
+            for e in evs:
+                if e["status"] not in ("STATUS_FULL_TIME", "STATUS_FINAL_PEN", "STATUS_FINAL_AET"):
+                    continue
+                h = next(t for t in e["t"] if t["ha"] == "home"); a = next(t for t in e["t"] if t["ha"] == "away")
+                num = lambda t, k: pd.to_numeric(t["st"].get(k), errors="coerce")
+                c = num(h, "wonCorners") + num(a, "wonCorners")
+                out.setdefault(e["id"], {}).update({"hg": int(h["score"]), "ag": int(a["score"]),
+                                                    **({"corners": float(c)} if not pd.isna(c) else {})})
+    except (OSError, KeyError, ValueError, StopIteration):
+        pass
+    try:
+        matches = _load("jugadores.json")["matches"]
+    except (OSError, KeyError):
+        matches = []
+    for m in matches:
+        r = out.setdefault(m["id"], {})
+        if m.get("score") and m["score"][0] is not None:
+            r.setdefault("hg", m["score"][0]); r.setdefault("ag", m["score"][1])
+        if m.get("ht") and None not in m["ht"]:
+            r["hthg"], r["htag"] = m["ht"]
+        st = [t.get("st") or {} for t in m.get("teams") or []]
+        if len(st) == 2:
+            num = lambda d, k: pd.to_numeric(d.get(k), errors="coerce")
+            c, y = num(st[0], "wonCorners") + num(st[1], "wonCorners"), num(st[0], "yellowCards") + num(st[1], "yellowCards")
+            if not pd.isna(c):
+                r["corners"] = float(c)
+            if not pd.isna(y):
+                r["cards"] = float(y)
+    return {k: v for k, v in out.items() if v.get("hg") is not None}

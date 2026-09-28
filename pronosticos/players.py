@@ -105,8 +105,9 @@ def team_rate_predictor(T: pd.DataFrame, lg: str, col: str, ref_date=None):
     return predict
 
 
-def team_stat_markets(T, lg, home, away, neutral=False):
-    """Mercados de equipo: tiros, tiros al arco, faltas, fueras de juego, tarjetas (según ESPN)."""
+def team_stat_markets(T, lg, home, away, neutral=False, yc_factor=1.0):
+    """Mercados de equipo: tiros, tiros al arco, faltas, fueras de juego, tarjetas (según ESPN).
+    yc_factor: factor del árbitro sobre las amarillas (1 = árbitro promedio o desconocido)."""
     out = {}
     specs = [("sh", "tiros", (19.5, 22.5, 24.5, 26.5, 28.5)), ("sot", "tiros_al_arco", (6.5, 7.5, 8.5, 9.5, 10.5)),
              ("fc", "faltas", (19.5, 21.5, 23.5, 25.5)), ("off", "fueras_de_juego", (2.5, 3.5, 4.5)),
@@ -116,6 +117,8 @@ def team_stat_markets(T, lg, home, away, neutral=False):
         if pr is None:
             continue
         eh, ea = pr(home, away, True, neutral), pr(away, home, False, neutral)
+        if col == "yc":
+            eh, ea = eh * yc_factor, ea * yc_factor
         tot = eh + ea
         size = NB_SIZE.get(col, 8.0) * 3
         dist = lambda m: nbinom(size, size / (size + m))

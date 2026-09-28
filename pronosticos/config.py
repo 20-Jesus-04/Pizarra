@@ -33,8 +33,8 @@ XG_WEIGHT = 0.35              # peso del xG frente a los goles reales cuando hay
 HOME_SHRINK = 8.0             # penalización para la ventaja local por equipo (más = más parecida a la media)
 MAX_GOALS = 10
 
-# Mezcla modelo/mercado para las probabilidades finales (se recalibra con el backtest)
-MARKET_WEIGHT = 0.75
+# El peso de cada modelo (incluido el mercado) ya no es fijo: lo calcula ensamble.calibrar() cada semana
+# con el backtest y queda en data/modelo.json. Árbitros: arbitros.py. Filtros de fijas: fijas.py.
 
 # Criterios de "valor"
 MIN_EDGE = 0.03               # ventaja mínima (prob_modelo * cuota - 1)

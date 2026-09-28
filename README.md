@@ -1,13 +1,16 @@
 # Pizarra de Pronósticos
 
-Motor de pronósticos de fútbol (Premier, LaLiga, Serie A, Bundesliga, Ligue 1, Liga 1 Perú y selecciones: Nations League, eliminatorias, Copa América, Eurocopa, Mundial, Copa África, amistosos) que:
+Motor de pronósticos de fútbol (Premier, LaLiga, Serie A, Bundesliga, Ligue 1, Liga 1 Perú y selecciones: Nations League, eliminatorias, Copa América, Eurocopa, Mundial, Copa África, amistosos) que corre solo cada día:
 
-1. Descarga resultados, estadísticas y cuotas históricas (football-data.co.uk), resultados de selecciones desde 2014 (martj42/international_results) y la Liga 1, los próximos partidos y las cuotas actuales (ESPN).
-2. Ajusta un modelo **Dixon-Coles** por liga (ataque/defensa por equipo, ventaja local por equipo, más peso a lo reciente, xG aproximado con tiros).
-3. Mezcla el modelo con el mercado (75% / 25%, calibrado con backtest) y calcula más de 25 mercados por partido.
-4. Proyecta a cada jugador (minutos, goles, asistencias, tiros, tiros al arco, faltas, tarjetas, fueras de juego) con sus estadísticas partido a partido de ESPN, y calcula mercados de equipo (tiros, tiros al arco, faltas, fueras de juego, córners, tarjetas).
-5. Compara con las cuotas reales: valor esperado, cuota justa y stake (¼ Kelly).
-6. Genera `docs/index.html`, una web estática con todo lo anterior + forma, estadísticas, H2H, tablas y el backtest.
+1. **Datos**: resultados, estadísticas, cuotas y árbitros (football-data.co.uk), selecciones desde 2014 (martj42/international_results), Liga 1, próximos partidos, cuotas actuales, fichas de jugadores y árbitros designados (ESPN).
+2. **Seis modelos independientes**: Poisson, Dixon-Coles, Elo, Bayesiano (Gamma-Poisson), consenso del mercado (cuotas sin margen) y XGBoost (forma, descanso, xG reciente, Elo…).
+3. **Ensamble**: los pesos de cada modelo se recalibran cada semana con un backtest walk-forward (cada semana se reentrena solo con el pasado) y se validan con partidos que no se usaron para elegirlos. Con cuotas, el mercado se lleva casi todo el peso (es muy difícil de superar); sin cuotas (Liga 1, selecciones, partidos lejanos) el ensamble mejora a Dixon-Coles solo.
+4. **Mercados**: el 1X2 y el over 2.5 del ensamble se convierten en una matriz de marcadores → más de 25 mercados + jugadores + estadísticas de equipo.
+5. **Árbitros**: las tarjetas esperadas se multiplican por el factor del árbitro (tarjetas reales / esperadas por los equipos, encogido hacia la media).
+6. **Auditor automático**: reglas que marcan cada pronóstico como ok / revisar / bloqueado.
+7. **Fijas**: filtro estricto (calibración, Beta-Binomial por subtipo, forma reciente, tope de correlación, pausa automática).
+8. **Historial**: cada predicción se registra antes del partido en `data/historial.json`, se liquida después y nunca se borra. La web muestra Brier, calibración y acierto reales.
+9. `docs/index.html`: web estática con todo lo anterior (Partidos, Fijas, Resultados, Ligas, Método).
 
 ## Uso en tu PC
 
@@ -27,24 +30,25 @@ Abre `docs/index.html` en el navegador. La primera vez tarda más (descarga ~3.0
 
 Si alguna fuente bloquea los servidores de GitHub, ejecútalo en tu PC con el Programador de tareas de Windows (`python -m pronosticos.build`) y sube `docs/`.
 
-## Ajustes (`pronosticos/config.py`)
+## Ajustes
 
-| Parámetro | Qué controla |
+| Dónde | Qué controla |
 |---|---|
-| `MARKET_WEIGHT` | Peso del mercado en la probabilidad final (0.75) |
-| `MIN_EDGE`, `MIN_PROB` | Cuándo marcar una apuesta "con valor" |
-| `KELLY_FRACTION` | Fracción de Kelly para el stake |
-| `XI` | Rapidez con la que "olvida" partidos viejos |
-| `DAYS_AHEAD` | Cuántos días de partidos mostrar |
-| `LEAGUES` | Ligas incluidas |
-| `INT_COMPETITIONS` | Competiciones de selecciones que se siguen |
-| `FRIENDLY_WEIGHT`, `INT_XI` | Peso de los amistosos y memoria del modelo de selecciones |
+| `config.py` `MIN_EDGE`, `MIN_PROB`, `KELLY_FRACTION` | Cuándo marcar una apuesta "con valor" y el stake |
+| `config.py` `XI`, `INT_XI`, `FRIENDLY_WEIGHT` | Memoria de los modelos y peso de amistosos |
+| `config.py` `DAYS_AHEAD`, `LEAGUES`, `INT_COMPETITIONS` | Qué partidos y ligas se muestran |
+| `ensamble.py` `MAX_AGE_DAYS` | Cada cuántos días se recalibra el ensamble (6) |
+| `arbitros.py` `REF_K`, `REF_XI` | Cuánto se encoge el factor del árbitro y su memoria |
+| `fijas.py` | Umbrales de las fijas (calibrada ≥72%, límite creíble ≥65%, forma 6/10, topes) |
+
+`python -m pronosticos.build --recalibrar` fuerza el backtest del ensamble (≈2-3 min).
 
 ## Archivos
 
-- `pronosticos/fetch.py` descarga · `data.py` limpia y une fuentes · `model.py` Dixon-Coles
-- `players.py` jugadores y estadísticas de equipo · `markets.py` todos los mercados · `stats.py` forma/H2H/tabla/córners · `backtest.py` validación
-- `build.py` pipeline completo · `web/template.html` la página
+- `fetch.py` descarga · `data.py` limpia y une fuentes · `model.py` Dixon-Coles · `modelos.py` Poisson, Bayes, Elo, XGBoost
+- `ensamble.py` backtest, pesos, calibración y motor · `arbitros.py` · `auditor.py` · `fijas.py` · `historial.py` · `picks.py`
+- `players.py` jugadores · `markets.py` mercados · `stats.py` forma/H2H/tabla · `backtest.py` métricas
+- `build.py` pipeline completo · `web-src/` la interfaz (compilada en `web/app.html`)
 
 ## Límites
 

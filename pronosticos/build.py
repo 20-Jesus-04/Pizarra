@@ -1,8 +1,9 @@
-"""Pipeline completo: (descarga) -> modelo -> mercados -> alternativas -> backtest -> web.
+"""Pipeline completo: (descarga) -> 6 modelos -> ensamble -> mercados -> auditoría -> fijas -> historial -> web.
 
 Uso:
     python -m pronosticos.build            # descarga datos frescos y genera docs/index.html
     python -m pronosticos.build --offline  # usa la caché de data/ sin descargar
+    python -m pronosticos.build --recalibrar   # fuerza el backtest semanal del ensamble
 """
 from __future__ import annotations
 
@@ -13,32 +14,16 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
 
-from .config import LEAGUES, INT_XI, DAYS_AHEAD, MARKET_WEIGHT, MIN_EDGE, MIN_PROB, KELLY_FRACTION
-from .data import load_all, ES_NAMES
-from .model import DixonColes, score_matrix
+from .config import LEAGUES, DAYS_AHEAD, MIN_EDGE, MIN_PROB, KELLY_FRACTION
+from .data import load_all, load_results, ES_NAMES
 from .markets import all_markets
 from .stats import team_profile, head_to_head, standings, rate_model
-from .backtest import walk_forward, evaluate, devig
-from .players import load_player_data, squad_projection, compact, PKEYS, team_stat_markets, team_rate_predictor, validate_players
+from .players import load_player_data, squad_projection, compact, PKEYS, team_stat_markets, team_rate_predictor
+from .picks import PICK_LABELS, get as _get
+from . import arbitros, auditor, ensamble, fijas, historial
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-# ------------------------------------------------------------------ mercado -> goles esperados implícitos
-def implied_rates(pH, pA, p_over, line, rho, lam0, mu0):
-    """Busca (lambda, mu) cuya matriz reproduce las probabilidades del mercado."""
-    def loss(x):
-        lam, mu = np.exp(x)
-        M = score_matrix(lam, mu, rho)
-        i, j = np.indices(M.shape)
-        e = (M[i > j].sum() - pH) ** 2 + (M[i < j].sum() - pA) ** 2
-        if p_over is not None:
-            e += (M[(i + j) > line].sum() - p_over) ** 2
-        return e
-    r = minimize(loss, np.log([lam0, mu0]), method="Nelder-Mead", options={"xatol": 1e-4, "fatol": 1e-9})
-    return tuple(np.exp(r.x))
 
 
 def ev_row(market, selection, p, odds, fair_source=""):
@@ -74,46 +59,7 @@ def ah_ev(mk, line_home, odds_h, odds_a):
     return out
 
 
-PICK_LABELS = [
-    # (familia, ruta, etiqueta)
-    ("dc", ("doble_oportunidad", "1X"), "Doble oportunidad 1X (local o empate)"),
-    ("dc", ("doble_oportunidad", "X2"), "Doble oportunidad X2 (visita o empate)"),
-    ("dc", ("doble_oportunidad", "12"), "Doble oportunidad 12 (no hay empate)"),
-    ("res", ("1x2", "1"), "Gana el local"),
-    ("res", ("1x2", "2"), "Gana la visita"),
-    ("dnb", ("empate_no_apuesta", "1"), "Empate no apuesta: local"),
-    ("dnb", ("empate_no_apuesta", "2"), "Empate no apuesta: visita"),
-    ("ou", ("goles_totales", "1.5", "over"), "Más de 1.5 goles"),
-    ("ou", ("goles_totales", "2.5", "over"), "Más de 2.5 goles"),
-    ("ou", ("goles_totales", "2.5", "under"), "Menos de 2.5 goles"),
-    ("ou", ("goles_totales", "3.5", "under"), "Menos de 3.5 goles"),
-    ("ou", ("goles_totales", "4.5", "under"), "Menos de 4.5 goles"),
-    ("btts", ("ambos_marcan", "si"), "Ambos marcan: Sí"),
-    ("btts", ("ambos_marcan", "no"), "Ambos marcan: No"),
-    ("tl", ("goles_local", "0.5", "over"), "Local marca al menos 1 gol"),
-    ("tl", ("goles_local", "1.5", "over"), "Local marca 2 o más"),
-    ("tv", ("goles_visita", "0.5", "over"), "Visita marca al menos 1 gol"),
-    ("tv", ("goles_visita", "1.5", "under"), "Visita marca 1 o menos"),
-    ("tl2", ("goles_local", "1.5", "under"), "Local marca 1 o menos"),
-    ("ht", ("primer_tiempo_goles", "0.5", "over"), "Hay gol en el 1er tiempo"),
-    ("ht", ("primer_tiempo_goles", "1.5", "under"), "Menos de 1.5 goles en el 1er tiempo"),
-    ("ah", ("handicap_asiatico_local", "-1", "gana"), "Hándicap asiático local -1"),
-    ("ah", ("handicap_asiatico_local", "+1", "pierde"), "Hándicap asiático visita -1"),
-    ("co", ("corners", "total", "8.5", "over"), "Más de 8.5 córners"),
-    ("co", ("corners", "total", "11.5", "under"), "Menos de 11.5 córners"),
-    ("ca", ("tarjetas", "total", "2.5", "over"), "Más de 2.5 tarjetas"),
-]
-
-
-def _get(d, path):
-    for k in path:
-        if not isinstance(d, dict) or k not in d:
-            return None
-        d = d[k]
-    return d
-
-
-def best_alternatives(mk, lo=0.62, hi=0.93, n=5):
+def best_alternatives(mk, curva=None, lo=0.62, hi=0.93, n=5):
     cands = []
     for fam, path, label in PICK_LABELS:
         p = _get(mk, path)
@@ -121,7 +67,8 @@ def best_alternatives(mk, lo=0.62, hi=0.93, n=5):
             continue
         # puntuación: probabilidad, pero premiando selecciones con cuota justa más alta (más informativas)
         score = p * (1 / p) ** 0.35
-        cands.append({"familia": fam, "seleccion": label, "prob": round(p, 4), "cuota_justa": round(1 / p, 2),
+        cands.append({"familia": fam, "clave": "|".join(path), "seleccion": label, "prob": round(p, 4),
+                      "prob_calibrada": round(ensamble.calibrate_prob(p, curva), 4), "cuota_justa": round(1 / p, 2),
                       "_s": score, "nivel": "alta" if p >= 0.78 else "media"})
     cands.sort(key=lambda x: -x["_s"])
     out, fams = [], set()
@@ -172,28 +119,53 @@ def season_of(df):
     return s[:4] if df["div"].iloc[0] in ("PER", "INT") else s
 
 
-def run(offline=False, backtest=True, out_dir=None):
+def lima_day(iso: str) -> str:
+    """Fecha (AAAA-MM-DD) en hora de Lima, para topes diarios."""
+    return (pd.Timestamp(iso).tz_convert("America/Lima") if pd.Timestamp(iso).tzinfo else pd.Timestamp(iso)).strftime("%Y-%m-%d")
+
+
+def referee_tables(leagues, rates_y, T):
+    """Tabla de árbitros por liga: football-data si trae el árbitro (Inglaterra), si no las fichas de ESPN."""
+    out = {}
+    for code, df in leagues.items():
+        rows = arbitros.fd_rows(df, rates_y.get(code)) if code != "INT" else None
+        if rows is None or len(rows) < 100:
+            yp = team_rate_predictor(T, code, "yc") if T is not None else None
+            rows = arbitros.espn_rows(T, code, yp)
+        out[code] = arbitros.factors(rows) if len(rows) else {}
+    return out
+
+
+def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
     if not offline:
-        from .fetch import fetch_all
+        from .fetch import fetch_all, fetch_players
         print("Descargando datos…")
         fetch_all()
-    if not offline:
-        from .fetch import fetch_players
         print("Descargando estadísticas de jugadores…")
         fetch_players()
     leagues, upcoming, fetched = load_all()
     P, T = load_player_data()
     now = datetime.now(timezone.utc)
     horizon = now + timedelta(days=DAYS_AHEAD)
-    out = {"n_actuaciones": int(len(P)) if P is not None else 0, "pkeys": PKEYS, "generado": now.isoformat(), "datos_actualizados": fetched, "ligas": {}, "partidos": [], "config": {
-        "peso_mercado": MARKET_WEIGHT, "min_ventaja": MIN_EDGE, "min_prob": MIN_PROB, "kelly": KELLY_FRACTION, "dias": DAYS_AHEAD}}
 
-    models, rates_c, rates_y = {}, {}, {}
+    # 1) calibración semanal del ensamble (backtest de los 6 modelos, pesos, curva, subtipos, árbitros)
+    cache = ensamble.load_cache()
+    if recalibrar or not ensamble.cache_is_fresh(cache, now) and (backtest or cache is None):
+        print("Calibrando el ensamble (backtest walk-forward de los 6 modelos)…")
+        cache = ensamble.calibrar(leagues, now, P=P if backtest else None)
+        ensamble.save_cache(cache)
+    else:
+        print(f"Usando la calibración del {cache['fecha'][:10]}")
+
+    # 2) modelos ajustados con todos los datos de hoy
+    print("Ajustando los 6 modelos…")
+    motor = ensamble.Motor(leagues, cache)
+    out = {"n_actuaciones": int(len(P)) if P is not None else 0, "pkeys": PKEYS, "generado": now.isoformat(),
+           "datos_actualizados": fetched, "ligas": {}, "partidos": [],
+           "config": {"min_ventaja": MIN_EDGE, "min_prob": MIN_PROB, "kelly": KELLY_FRACTION, "dias": DAYS_AHEAD}}
+    rates_c, rates_y = {}, {}
     for code, df in leagues.items():
-        print(f"Ajustando modelo {code} ({len(df)} partidos)…")
-        mkw = dict(xi=INT_XI, home_shrink=30.0, promoted_prior=False) if code == "INT" else {}
-        m = DixonColes(**mkw).fit(df)
-        models[code] = m
+        m = motor.m[code]["dc"]
         rates_c[code] = rate_model(df, "hc", "ac")
         rates_y[code] = rate_model(df, "hy", "ay")
         cur = season_of(df)
@@ -213,63 +185,68 @@ def run(offline=False, backtest=True, out_dir=None):
         }
         if P is not None:
             info["goleadores"] = top_scorers(P, code, now)
-        if P is not None and backtest:
-            print(f"  validando proyecciones de jugadores {code}…")
-            info["validacion_jugadores"] = validate_players(P, code)
-        if backtest:
-            seasons = [str(now.year - 1), str(now.year)] if code in ("PER", "INT") else sorted(set(df.season))[-2:]
-            bt = walk_forward(df, seasons, **mkw)
-            info["backtest"] = evaluate(bt)
-            info["backtest"]["temporadas"] = seasons
+        if cache.get("ligas", {}).get(code):
+            info["backtest"] = cache["ligas"][code]
+        if cache.get("validacion_jugadores", {}).get(code):
+            info["validacion_jugadores"] = cache["validacion_jugadores"][code]
         out["ligas"][code] = info
+    ref_tabs = referee_tables(leagues, rates_y, T)
+    curva = cache.get("curva")
 
+    # 3) cada próximo partido
     for u in upcoming:
         dt = pd.Timestamp(u["date"]).to_pydatetime()
         if dt > horizon or dt < now - timedelta(hours=3):
             continue
         code = u["league"]
-        df, m = leagues[code], models[code]
+        df = leagues[code]
         cur = season_of(df)
-        lam_m, mu_m = m.rates(u["home"], u["away"], neutral=bool(u.get("neutral")))
-        model_mk = all_markets(lam_m, mu_m, m.rho, m.ht_frac)
-        lam, mu = lam_m, mu_m
+        neutral = bool(u.get("neutral"))
         o = u.get("odds")
+        pred = motor.predict(code, u["home"], u["away"], neutral, u["date"], o)
+        comb = motor.combine(pred)
+        lam, mu = motor.rates_for(pred, comb)
+        dc = pred["dc"]
         market = None
-        if o and o.get("H") and o.get("D") and o.get("A"):
-            pm = devig(np.array([o["H"], o["D"], o["A"]]))
-            p_over = None
-            if o.get("over") and o.get("under") and o.get("ou_line"):
-                p_over = float(devig(np.array([o["over"], o["under"]]))[0])
-            lam_k, mu_k = implied_rates(pm[0], pm[2], p_over, o.get("ou_line") or 2.5, m.rho, lam_m, mu_m)
-            w = MARKET_WEIGHT
-            lam = float(np.exp((1 - w) * np.log(lam_m) + w * np.log(lam_k)))
-            mu = float(np.exp((1 - w) * np.log(mu_m) + w * np.log(mu_k)))
-            margin = float(sum(1 / np.array([o["H"], o["D"], o["A"]])) - 1)
-            market = {"1": round(float(pm[0]), 4), "X": round(float(pm[1]), 4), "2": round(float(pm[2]), 4),
-                      "over": round(p_over, 4) if p_over else None, "margen_casa": round(margin, 4),
-                      "xg_home": round(lam_k, 3), "xg_away": round(mu_k, 3)}
+        if "mercado" in pred["modelos"]:
+            mk_ = pred["modelos"]["mercado"]
+            market = {"1": round(mk_["1"], 4), "X": round(mk_["X"], 4), "2": round(mk_["2"], 4),
+                      "over": round(mk_["o25"], 4) if "o25" in mk_ else None,
+                      "margen_casa": round(float(sum(1 / np.array([o["H"], o["D"], o["A"]])) - 1), 4)}
+        # árbitro: multiplica las tarjetas esperadas
+        arb = arbitros.lookup(ref_tabs.get(code, {}), u.get("arbitro")) if u.get("arbitro") else None
+        fac = arb["factor"] if arb else 1.0
         corners = rates_c[code](u["home"], u["away"]) if rates_c[code] else None
         cards = rates_y[code](u["home"], u["away"]) if rates_y[code] else None
         if cards is None and T is not None:  # Liga 1 y selecciones: tarjetas desde ESPN
             yp = team_rate_predictor(T, code, "yc")
             if yp:
-                cards = (yp(u["home_espn"], u["away_espn"], True, u.get("neutral")), yp(u["away_espn"], u["home_espn"], False, u.get("neutral")))
+                cards = (yp(u["home_espn"], u["away_espn"], True, neutral), yp(u["away_espn"], u["home_espn"], False, neutral))
         if corners is None and T is not None:
             cp = team_rate_predictor(T, code, "cor")
             if cp:
-                corners = (cp(u["home_espn"], u["away_espn"], True, u.get("neutral")), cp(u["away_espn"], u["home_espn"], False, u.get("neutral")))
-        mk = all_markets(lam, mu, m.rho, m.ht_frac, corners, cards)
+                corners = (cp(u["home_espn"], u["away_espn"], True, neutral), cp(u["away_espn"], u["home_espn"], False, neutral))
+        cards_base = cards
+        if cards:
+            cards = (cards[0] * fac, cards[1] * fac)
+        if arb:
+            arb = {**arb, "tarjetas_sin_arbitro": round(sum(cards_base), 2) if cards_base else None,
+                   "tarjetas_con_arbitro": round(sum(cards), 2) if cards else None}
+        mk = all_markets(lam, mu, dc.rho, dc.ht_frac, corners, cards)
         jugadores = {"local": [], "visita": []}
         if T is not None:
-            mk.update(team_stat_markets(T, code, u["home_espn"], u["away_espn"], bool(u.get("neutral"))))
+            mk.update(team_stat_markets(T, code, u["home_espn"], u["away_espn"], neutral, yc_factor=fac))
         if P is not None:
             shp = team_rate_predictor(T, code, "sh")
-            sh_h = shp(u["home_espn"], u["away_espn"], True, u.get("neutral")) if shp else None
-            sh_a = shp(u["away_espn"], u["home_espn"], False, u.get("neutral")) if shp else None
+            sh_h = shp(u["home_espn"], u["away_espn"], True, neutral) if shp else None
+            sh_a = shp(u["away_espn"], u["home_espn"], False, neutral) if shp else None
             ts = pd.Timestamp(now).tz_localize(None)
             jugadores = {"local": compact(squad_projection(P, code, u["home_espn"], u["away_espn"], ts, lam, sh_h)),
                          "visita": compact(squad_projection(P, code, u["away_espn"], u["home_espn"], ts, mu, sh_a))}
 
+        n_h = int(((df.home == u["home"]) | (df.away == u["home"])).sum())
+        n_a = int(((df.home == u["away"]) | (df.away == u["away"])).sum())
+        audit = auditor.revisar(mk, comb, pred, lam, mu, n_h, n_a, o, arb)
         value = []
         if o:
             for sel, key in (("1", "H"), ("X", "D"), ("2", "A")):
@@ -283,24 +260,32 @@ def run(offline=False, backtest=True, out_dir=None):
                     if r: value.append(r)
             if o.get("ah_line") is not None:
                 value += ah_ev(mk, float(o["ah_line"]), o.get("ah_home"), o.get("ah_away"))
+            if audit["estado"] == "bloqueado":
+                for r in value:
+                    r["valor"] = False
 
-        # confianza: cantidad de datos de ambos equipos y acuerdo modelo-mercado
-        n_h = int(((df.home == u["home"]) | (df.away == u["home"])).sum())
-        n_a = int(((df.home == u["away"]) | (df.away == u["away"])).sum())
+        own = comb["propio"]
         disagreement = None
         if market:
-            disagreement = round(float(np.abs(np.array([model_mk["1x2"][k] for k in "1X2"]) -
-                                              np.array([market[k] for k in "1X2"])).sum() / 2), 4)
+            disagreement = round(float(sum(abs(own[k] - market[k]) for k in ("1", "X", "2")) / 2), 4)
         conf = min(1.0, min(n_h, n_a) / 60) * (1 - min(disagreement or 0, 0.3))
+        mods = pred["modelos"]
         out["partidos"].append({
             "id": u["id"], "liga": code, "fecha": u["date"], "estadio": u.get("venue"),
-            "competicion": u.get("competicion") or LEAGUES[code]["name"], "neutral": bool(u.get("neutral")),
+            "competicion": u.get("competicion") or LEAGUES[code]["name"], "neutral": neutral,
             "local": u["home_display"], "visita": u["away_display"], "local_key": u["home"], "visita_key": u["away"],
-            "cuotas": o, "mercado": market, "modelo_puro": {"1x2": model_mk["1x2"], "xg_home": round(lam_m, 3), "xg_away": round(mu_m, 3),
-                                                            "over25": model_mk["goles_totales"]["2.5"]["over"],
-                                                            "btts": model_mk["ambos_marcan"]["si"]},
+            "cuotas": o, "mercado": market,
+            "modelo_puro": {"1x2": {k: round(v, 4) for k, v in own.items()}, "xg_home": round(pred["rates"]["dixon_coles"][0], 3),
+                            "xg_away": round(pred["rates"]["dixon_coles"][1], 3)},
+            "modelos": {"lista": [{"clave": k, "1": round(mods[k]["1"], 4), "X": round(mods[k]["X"], 4), "2": round(mods[k]["2"], 4),
+                                   "o25": round(mods[k]["o25"], 4) if "o25" in mods[k] else None,
+                                   "peso": comb["pesos"].get(k, 0.0), "peso_o25": comb["pesos_o25"].get(k)}
+                                  for k in ensamble.MODELOS if k in mods],
+                        "elo": [round(pred["elo"][0]), round(pred["elo"][1])]},
+            "arbitro": arb,
+            "auditoria": audit,
             "mercados": mk, "valor": sorted(value, key=lambda r: -r["ev"]),
-            "alternativas": best_alternatives(mk),
+            "alternativas": best_alternatives(mk, curva),
             "confianza": round(conf, 2), "desacuerdo_modelo_mercado": disagreement,
             "perfil_local": team_profile(df, u["home"], cur), "perfil_visita": team_profile(df, u["away"], cur),
             "h2h": head_to_head(df, u["home"], u["away"]),
@@ -322,6 +307,27 @@ def run(offline=False, backtest=True, out_dir=None):
         for m in p["h2h"]["partidos"]:
             m["local"], m["visita"] = tr(m["local"]), tr(m["visita"])
 
+    # 4) historial: liquidar lo jugado, elegir fijas, registrar lo nuevo (antes del inicio)
+    hist = historial.load()
+    n_liq = historial.liquidar(hist, load_results(), now)
+    res = historial.metricas(hist, now, lima_day)
+    estado = {"liquidados_30d": res.get("liquidados_30d", 0), "fijas_30d_n": (res.get("fijas_30d") or {}).get("n", 0),
+              "fijas_30d_acierto": (res.get("fijas_30d") or {}).get("acierto")}
+    out["fijas"] = fijas.seleccionar(out["partidos"], cache, historial.subtipos_reales(hist), estado, now, lima_day)
+    fset = {}
+    for f in out["fijas"]["lista"]:
+        fset.setdefault(f["id"], []).append(f["clave"])
+    for p in out["partidos"]:
+        p["fijas"] = fset.get(p["id"], [])
+    n_reg = historial.registrar(hist, out["partidos"], out["fijas"]["lista"], now)
+    historial.save(hist)
+    out["resultados"] = historial.metricas(hist, now, lima_day)
+    print(f"Historial: {n_reg} predicciones registradas, {n_liq} liquidadas, {len(out['fijas']['lista'])} fijas")
+
+    # 5) transparencia: cómo está calibrado el motor
+    out["metodologia"] = {k: cache.get(k) for k in ("fecha", "pesos", "evaluacion", "calibracion", "arbitros", "picks_simulados",
+                                                    "acierto_simulado_70", "nombres")}
+    out["metodologia"]["arbitros_conocidos"] = {c: len(t) for c, t in ref_tabs.items()}
     write_web(out, out_dir)
     return out
 
@@ -369,11 +375,12 @@ def _json_default(o):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--offline", action="store_true", help="no descargar, usar data/ existente")
-    ap.add_argument("--sin-backtest", action="store_true")
+    ap.add_argument("--sin-backtest", action="store_true", help="no recalibrar aunque la calibración tenga más de 6 días")
+    ap.add_argument("--recalibrar", action="store_true", help="forzar el backtest y la calibración del ensamble")
     ap.add_argument("--solo-web", action="store_true", help="regenerar solo la página desde docs/data.json")
     a = ap.parse_args()
     if a.solo_web:
         with open(os.path.join(ROOT, "docs", "data.json"), encoding="utf-8") as f:
             write_web(json.load(f))
     else:
-        run(offline=a.offline, backtest=not a.sin_backtest)
+        run(offline=a.offline, backtest=not a.sin_backtest, recalibrar=a.recalibrar)
