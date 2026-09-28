@@ -86,6 +86,8 @@ def load_peru(raw) -> pd.DataFrame:
                 "hposs": f(h, "possessionPct"), "aposs": f(a, "possessionPct"),
                 "season": f"{year}-{e.get('season') or ''}", "div": "PER",
             })
+    if not rows:
+        return pd.DataFrame()
     d = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
     for c in ["hthg", "htag", "hxg", "axg", "hy", "ay", "hr", "ar", "hf", "af", "referee"] + list(ODDS):
         d[c] = np.nan
@@ -264,7 +266,7 @@ def load_all():
     top5 = _load("espn_top5.json")
     leagues = load_europe(raw)
     leagues["PER"] = load_peru(raw)
-    leagues = {k: add_xg_proxy(v) for k, v in leagues.items()}
+    leagues = {k: add_xg_proxy(v) for k, v in leagues.items() if v is not None and not v.empty}
 
     upcoming = []
     for code, lg in LEAGUES.items():

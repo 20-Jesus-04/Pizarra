@@ -3,8 +3,8 @@ name: Actualizar pronosticos
 on:
   schedule:
     - cron: "17 11 * * *"   # todos los días 06:17 hora Lima
-    - cron: "47 16 * * 5,6" # viernes y sábado 11:47 Lima (cuotas más frescas antes del fin de semana)
-  workflow_dispatch:        # botón "Run workflow" para actualizar a mano
+    - cron: "47 16 * * 5,6" # viernes y sábado 11:47 Lima
+  workflow_dispatch:        # botón "Run workflow"
 
 permissions:
   contents: write
@@ -15,6 +15,30 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      - name: Revisar que el proyecto esté completo
+        run: |
+          if [ ! -f pronosticos/build.py ]; then
+            echo "::error::Falta la carpeta 'pronosticos' (con build.py) en la raíz del repositorio. Súbela arrastrando la carpeta completa."
+            echo "Esto es lo que hay en el repositorio:"
+            find . -path ./.git -prune -o -maxdepth 2 -print | sort
+            exit 1
+          fi
+          for d in docs data web; do [ -d "$d" ] || echo "::warning::Falta la carpeta '$d' en la raíz."; done
+
+      - name: Probar conexión con las fuentes de datos
+        continue-on-error: true
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+          for u in "https://www.football-data.co.uk/fixtures.csv" \
+                   "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard" \
+                   "https://site.api.espn.com/apis/site/v2/sports/soccer/per.1/scoreboard?dates=2026&limit=1000" \
+                   "https://site.web.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard" \
+                   "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"; do
+            code=$(curl -s -o /tmp/body -w "%{http_code} %{size_download}B %{time_total}s" -A "$UA" -m 25 "$u" || echo "fallo")
+            echo "$code  $u"; head -c 150 /tmp/body; echo
+          done
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

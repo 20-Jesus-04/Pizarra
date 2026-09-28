@@ -18,7 +18,17 @@ import requests
 from .config import LEAGUES, FD_BASE, ESPN_BASE, N_SEASONS_EUROPE, N_YEARS_PERU, INT_COMPETITIONS, INT_RESULTS_URL
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
-UA = {"User-Agent": "Mozilla/5.0 (pronosticos-bot)"}
+UA = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "es-PE,es;q=0.9,en;q=0.8",
+    "Referer": "https://www.espn.com/",
+    "Origin": "https://www.espn.com",
+}
+# Hosts alternativos de la API de ESPN (si uno bloquea, se prueba el siguiente).
+ESPN_HOSTS = [ESPN_BASE, ESPN_BASE.replace("site.api.espn.com", "site.web.api.espn.com")]
+_FAILS = {}          # host -> fallos seguidos (para no perder 15 minutos reintentando un host caído)
+_LOGGED = set()
 
 
 def season_codes(now: datetime, n: int) -> list[str]:
@@ -26,23 +36,49 @@ def season_codes(now: datetime, n: int) -> list[str]:
     return [f"{(y) % 100:02d}{(y + 1) % 100:02d}" for y in range(start - n + 1, start + 1)]
 
 
-def _get(url: str, tries: int = 3, **kw):
+def _host(url: str) -> str:
+    return url.split("/")[2]
+
+
+def _get(url: str, tries: int = 2, **kw):
+    host = _host(url)
+    if _FAILS.get(host, 0) >= 6:   # host caído: no insistir
+        return None
     for i in range(tries):
         try:
-            r = requests.get(url, headers=UA, timeout=30, **kw)
+            r = requests.get(url, headers=UA, timeout=20, **kw)
             if r.status_code == 200:
+                _FAILS[host] = 0
                 return r
-            if r.status_code == 404:
+            if host not in _LOGGED:
+                _LOGGED.add(host)
+                print(f"::warning::{host} respondió {r.status_code} para {r.url[:120]}: {r.text[:200]!r}")
+            if r.status_code in (400, 404):
                 return None
-        except requests.RequestException:
-            pass
+        except requests.RequestException as e:
+            if host not in _LOGGED:
+                _LOGGED.add(host)
+                print(f"::warning::No se pudo conectar con {host}: {type(e).__name__}: {str(e)[:200]}")
         time.sleep(1.5 * (i + 1))
+    _FAILS[host] = _FAILS.get(host, 0) + 1
+    return None
+
+
+def _espn(path: str, **params):
+    """Llama a la API de ESPN probando los hosts alternativos."""
+    for base in ESPN_HOSTS:
+        r = _get(f"{base}/{path}", params=params)
+        if r is not None:
+            try:
+                return r.json()
+            except ValueError:
+                continue
     return None
 
 
 def _espn_year(slug: str, year: int) -> list[dict]:
-    r = _get(f"{ESPN_BASE}/{slug}/scoreboard", params={"dates": str(year), "limit": 1000})
-    return (r.json().get("events") or []) if r else []
+    j = _espn(f"{slug}/scoreboard", dates=str(year), limit=1000)
+    return (j or {}).get("events") or []
 
 
 def _slim_event(e: dict) -> dict:
@@ -148,10 +184,9 @@ def fetch_all(verbose: bool = True) -> None:
     finals = {"STATUS_FULL_TIME", "STATUS_FINAL_PEN", "STATUS_FINAL_AET", "STATUS_FINAL"}
     for slug in INT_COMPETITIONS:
         for y in (now.year - 1, now.year):
-            rr = _get(f"{ESPN_BASE}/{slug}/scoreboard", params={"dates": str(y), "limit": 1000})
-            if rr is None:
+            j = _espn(f"{slug}/scoreboard", dates=str(y), limit=1000)
+            if not j:
                 continue
-            j = rr.json()
             comp = ((j.get("leagues") or [{}])[0]).get("name")
             for e in j.get("events") or []:
                 c = e["competitions"][0]
@@ -168,9 +203,41 @@ def fetch_all(verbose: bool = True) -> None:
                                        "odds": _pick_odds((c.get("odds") or [None])[0])})
     log(f"  ESPN selecciones: {len(intl['up'])} próximos, {len(intl['done'])} jugados")
 
+    # Si una fuente falló, se conserva lo que ya había en la caché en vez de dejar la web vacía.
+    old = lambda n: _load_old(n)
+    o_raw = old("raw.json") or {}
+    if not raw["fd"]:
+        print("::warning::football-data no respondió: se usan los datos anteriores de Europa.")
+        raw["fd"] = o_raw.get("fd", {})
+    if not any(raw["espn"].values()):
+        print("::warning::ESPN (Liga 1) no respondió: se usan los datos anteriores.")
+        raw["espn"] = o_raw.get("espn", {})
+    o_prox = (old("proximos.json") or {}).get("leagues", {})
+    o_top5 = old("espn_top5.json") or {}
+    for slug in list(prox["leagues"]):
+        if not prox["leagues"][slug] and o_prox.get(slug):
+            print(f"::warning::ESPN {slug}: sin datos nuevos, se conservan los anteriores.")
+            prox["leagues"][slug] = o_prox[slug]
+        if slug in top5 and not top5[slug] and o_top5.get(slug):
+            top5[slug] = o_top5[slug]
+    if not intl["up"] and not intl["done"]:
+        o_int = old("internacional.json")
+        if o_int:
+            print("::warning::ESPN selecciones: sin datos nuevos, se conservan los anteriores.")
+            intl = o_int
     for name, obj in (("raw.json", raw), ("proximos.json", prox), ("espn_top5.json", top5), ("internacional.json", intl)):
         with open(os.path.join(DATA_DIR, name), "w", encoding="utf-8") as f:
             json.dump(obj, f, ensure_ascii=False)
+    if _FAILS:
+        print("Hosts con fallos:", {h: n for h, n in _FAILS.items() if n})
+
+
+def _load_old(name):
+    try:
+        with open(os.path.join(DATA_DIR, name), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
 
 
 
@@ -246,8 +313,8 @@ def fetch_players(verbose: bool = True, workers: int = 8) -> None:
 
     def one(t):
         slug, lg, eid, date = t
-        r = _get(f"{ESPN_BASE}/{slug}/summary", params={"event": eid})
-        return summarize_event(r.json(), slug, lg, eid, date) if r else None
+        j = _espn(f"{slug}/summary", event=eid)
+        return summarize_event(j, slug, lg, eid, date) if j else None
 
     with ThreadPoolExecutor(workers) as ex:
         for res in ex.map(one, todo):
