@@ -93,7 +93,7 @@ function FijasList({ fijas }: { fijas: any[] }) {
       {days.map((d) => (
         <section key={d} className="mt-8 first:mt-0">
           <DayHead d={d} n={fijas.filter((f) => dayKey(f.fecha) === d).length} />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="fit-grid">
             {fijas.filter((f) => dayKey(f.fecha) === d).map((f, i) => <div key={i} className="row-in" style={{ animationDelay: `${i * 0.05}s` }}><OportunidadCard o={f} p={BY_ID[f.id]} /></div>)}
           </div>
         </section>
@@ -141,7 +141,7 @@ function OportunidadesList({ jugadores }: { jugadores: { p: any; o: any }[] }) {
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {list.length ? list.map(({ p, o }, i) => (
           <div key={p.id + (o.clave || o.seleccion)} className="row-in" style={{ animationDelay: `${Math.min(i, 12) * 0.04}s` }}>
-            {tipo === "partido" ? <OportunidadCard o={o} p={p} /> : <a href={`#p.${p.id}`} className="block h-full"><JugadorCard o={o} /></a>}
+            {tipo === "partido" ? <OportunidadCard o={o} p={p} /> : <a href={`#p.${p.id}`} className="block h-full"><JugadorCard o={o} side={o.equipo === p.local ? "L" : "V"} /></a>}
           </div>
         )) : <div className="card p-10 text-center text-chalk-3 md:col-span-2 xl:col-span-3">No hay oportunidades con estos filtros.</div>}
       </div>

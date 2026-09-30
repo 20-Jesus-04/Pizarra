@@ -128,8 +128,15 @@
 @keyframes vt-out { to { opacity: 0; transform: translateY(-8px) scale(.995) } }
 @keyframes vt-in { from { opacity: 0; transform: translateY(14px) } }
 
+/* título del inicio: se ajusta al ancho de su columna para no chocar con la tarjeta destacada */
+.hero-title { font-size: clamp(40px, 6.4vw, 80px); }
+@supports (font-size: 1cqw) { .hero-title { font-size: clamp(40px, 10.5cqw, 80px); } }
+
 /* componentes que se adaptan a su propio ancho */
 .cq { container-type: inline-size; }
+/* grilla que reparte el ancho entre las tarjetas que haya (sin columnas vacías) */
+.fit-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); }
+.fit-grid > * { max-width: 640px; }
 
 /* fila de partido: apilada en espacios angostos, en columnas cuando la lista es ancha */
 .mrow { display: grid; grid-template-columns: 52px minmax(0,1fr) 14px; gap: 12px 12px; align-items: center; }

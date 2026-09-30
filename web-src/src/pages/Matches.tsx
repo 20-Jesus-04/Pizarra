@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { DATA, DATA_AGE_H, LG, MATCHES, compName, dayKey, dayLabel, dayShort, fTime, favLabel, isLive, longDate, pct, picksFor, prettyAlt } from "@/lib/data";
-import { Badge, Page, PageHeader } from "@/components/ui-pz";
+import { Badge, HA, Page, PageHeader } from "@/components/ui-pz";
 
 const FIJAS = new Set((DATA.fijas?.lista || []).map((f: any) => f.id));
 
@@ -34,7 +34,7 @@ export default function Matches({ lg }: { lg: string | null }) {
         stats={[{ v: list.length, l: "partidos en los próximos días" }, { v: days.length, l: "días con partidos" },
           { v: nValor, l: "con valor frente a la casa", tone: "turf" }, { v: nFijas, l: "con una fija", tone: "gold" }]} />
 
-      <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-8">
+      <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-8 2xl:grid-cols-[280px_minmax(0,1fr)] 2xl:gap-10">
         {/* filtros: panel lateral en escritorio */}
         <aside className="hidden lg:block">
           <div className="sticky top-[88px] flex flex-col gap-4">
@@ -53,9 +53,9 @@ export default function Matches({ lg }: { lg: string | null }) {
             </nav>
             <div className="card p-4 text-[13px] leading-relaxed text-chalk-3">
               <div className="mb-2 font-bold text-chalk-2">Cómo leer la fila</div>
-              <div className="flex items-center gap-2"><i className="h-1.5 w-5 rounded-full bg-cobalt" />gana el local</div>
-              <div className="flex items-center gap-2"><i className="h-1.5 w-5 rounded-full bg-white/25" />empate</div>
-              <div className="flex items-center gap-2"><i className="h-1.5 w-5 rounded-full bg-turf" />gana la visita</div>
+              <div className="flex items-center gap-2"><HA side="L" /><i className="h-1.5 w-5 rounded-full bg-cobalt" />local: gana el local</div>
+              <div className="flex items-center gap-2"><span className="w-[17px]" /><i className="h-1.5 w-5 rounded-full bg-white/25" />empate</div>
+              <div className="flex items-center gap-2"><HA side="V" /><i className="h-1.5 w-5 rounded-full bg-turf" />visita: gana la visita</div>
               <a href="#fijas" className="mt-3 inline-flex items-center gap-1.5 font-bold text-gold hover:underline"><ShieldCheck className="h-4 w-4" />Ver las fijas</a>
             </div>
           </div>
@@ -111,10 +111,11 @@ export default function Matches({ lg }: { lg: string | null }) {
 function Row({ p, delay = 0 }: { p: any; delay?: number }) {
   const x = p.mercados["1x2"], k = picksFor(p)[0], fav = favLabel(p), d = p.destacada, nOp = (p.oportunidades || []).length;
   const live = isLive(p), fija = FIJAS.has(p.id);
-  const team = (name: string, prob: number, isFav: boolean) => (
-    <div className="flex min-w-0 items-center gap-3">
+  const team = (name: string, prob: number, isFav: boolean, side: "L" | "V") => (
+    <div className="flex min-w-0 items-center gap-2.5">
       <Badge name={name} size={30} />
       <span className={`truncate text-[15px] font-semibold ${isFav ? "text-chalk" : "text-chalk-2"}`}>{name}</span>
+      <HA side={side} neutral={p.neutral} />
       <span className={`num ml-auto shrink-0 text-[13.5px] ${isFav ? "font-bold text-gold" : "text-chalk-3"}`}>{pct(prob)}</span>
     </div>
   );
@@ -128,8 +129,8 @@ function Row({ p, delay = 0 }: { p: any; delay?: number }) {
         <div className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-tight text-chalk-3">{compName(p)}</div>
       </div>
       <div className="flex min-w-0 flex-col gap-2">
-        {team(p.local, x["1"], x["1"] >= x["2"] && x["1"] >= 0.45)}
-        {team(p.visita, x["2"], x["2"] > x["1"] && x["2"] >= 0.45)}
+        {team(p.local, x["1"], x["1"] >= x["2"] && x["1"] >= 0.45, "L")}
+        {team(p.visita, x["2"], x["2"] > x["1"] && x["2"] >= 0.45, "V")}
         <div className="mt-0.5 flex h-1 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
           {bar.map(([key, color, label]) => (
             <span key={key} className={`grow-x h-full rounded-full ${color}`} style={{ width: `${x[key] * 100}%` }} title={`${label} ${pct(x[key])}`} />

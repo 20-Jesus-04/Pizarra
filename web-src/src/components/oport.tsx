@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { ChevronDown, ShieldCheck, Sparkles, User } from "lucide-react";
 import { compName, dayKey, dayShort, fTime, pct, prettyAlt } from "@/lib/data";
-import { Badge, Ring } from "@/components/ui-pz";
+import { Badge, HA, Ring } from "@/components/ui-pz";
 
 export const SENALES: [string, string][] = [["historial", "Historial"], ["reciente", "Recientes"], ["jugadores", "Jugadores"], ["cuota", "Cuota"], ["probabilidad", "Probabilidad"]];
 const CORTO: Record<string, string> = { historial: "Historial", reciente: "Recientes", jugadores: "Jugadores", cuota: "Cuota", probabilidad: "Prob." };
@@ -11,22 +11,24 @@ const tone = (v: number) => (v >= 0.7 ? "bg-turf" : v >= 0.45 ? "bg-gold" : "bg-
 const ringColor = (s: number) => (s >= 75 ? "#2FE0A0" : s >= 65 ? "#FFC23D" : "#6C7BFF");
 
 /** Tarjeta de una oportunidad: pick, puntaje, señales, cuotas y motivos. Con `p` muestra además el partido. */
-export function OportunidadCard({ o, p, compact = false }: { o: any; p?: any; compact?: boolean }) {
+export function OportunidadCard({ o, p, compact = false, showMatch = true }: { o: any; p?: any; compact?: boolean; showMatch?: boolean }) {
   const [open, setOpen] = useState(false);
   const sel = p ? prettyAlt(p, o.seleccion) : o.seleccion;
-  const Wrap: any = p ? "a" : "div";
+  const link = p && showMatch;
+  const Wrap: any = link ? "a" : "div";
   return (
     <div className={`spot lift card relative flex h-full flex-col overflow-hidden ${o.fija ? "glow-border" : ""}`}>
-      <Wrap {...(p ? { href: `#p.${p.id}` } : {})} className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
-        {p && (
+      <Wrap {...(link ? { href: `#p.${p.id}` } : {})} className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
+        {link && (
           <div className="flex items-center justify-between gap-2 text-[12px] font-semibold text-chalk-3">
             <span className="truncate">{dayShort(dayKey(p.fecha))} · {fTime(p.fecha)} · {compName(p)}</span>
           </div>
         )}
-        {p && (
-          <div className="flex min-w-0 items-center gap-2 text-[14px] font-semibold">
-            <Badge name={p.local} size={22} /><span className="min-w-0 truncate">{p.local}</span><span className="text-chalk-3">vs</span>
-            <span className="min-w-0 truncate">{p.visita}</span><Badge name={p.visita} size={22} />
+        {link && (
+          <div className="flex min-w-0 items-center gap-1.5 text-[14px] font-semibold">
+            <Badge name={p.local} size={22} /><span className="min-w-0 truncate">{p.local}</span><HA side="L" />
+            <span className="px-0.5 text-chalk-3">vs</span>
+            <span className="min-w-0 truncate">{p.visita}</span><HA side="V" />
           </div>
         )}
         <div className="flex items-start gap-3">
@@ -77,10 +79,10 @@ export function OportunidadCard({ o, p, compact = false }: { o: any; p?: any; co
 }
 
 /** Oportunidad de jugador (tiros al arco, gol): solo aparecen donde la validación de jugadores lo respalda. */
-export function JugadorCard({ o }: { o: any }) {
+export function JugadorCard({ o, side }: { o: any; side?: "L" | "V" }) {
   return (
     <div className="spot lift card flex h-full flex-col gap-2.5 p-4">
-      <div className="flex items-center gap-2 text-[12px] font-semibold text-chalk-3"><User className="h-3.5 w-3.5 text-cobalt" />{o.equipo}</div>
+      <div className="flex items-center gap-2 text-[12px] font-semibold text-chalk-3"><User className="h-3.5 w-3.5 text-cobalt" />{o.equipo}{side && <HA side={side} />}</div>
       <div className="flex items-start justify-between gap-3">
         <div className="text-[16px] font-extrabold leading-snug">{o.seleccion}</div>
         <span className="num shrink-0 rounded-lg bg-white/[0.05] px-2 py-1 text-[13px] font-semibold">{o.puntaje}<span className="text-[10px] text-chalk-3"> pts</span></span>

@@ -118,7 +118,7 @@ export default function App() {
         <motion.div style={{ scaleX: progress }} className="fixed inset-x-0 top-0 z-[55] h-[3px] origin-left bg-gradient-to-r from-cobalt via-gold to-turf" />
 
         <header className="hdr sticky z-50 border-b border-white/[0.06] bg-night-900/70 backdrop-blur-xl" style={{ top: "env(safe-area-inset-top, 0px)" }}>
-          <div className="mx-auto flex h-[60px] max-w-[1240px] items-center gap-4 px-4 sm:h-[68px] sm:px-6 lg:px-8">
+          <div className="mx-auto flex h-[60px] max-w-[1560px] items-center gap-4 px-4 sm:h-[68px] sm:px-6 lg:px-8">
             <Logo />
             <nav className="ml-auto hidden items-center gap-0.5 lg:flex" aria-label="Principal">
               {NAV.map(([k, t]) => (
@@ -140,7 +140,7 @@ export default function App() {
         </main>
 
         <footer className="relative z-[1] border-t border-white/[0.06] bg-night-950/60 pb-28 backdrop-blur lg:pb-0">
-          <div className="mx-auto grid max-w-[1240px] grid-cols-2 gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
+          <div className="mx-auto grid max-w-[1560px] grid-cols-2 gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
             <div className="col-span-2 md:col-span-1">
               <Logo />
               <p className="mt-3 max-w-[42ch] text-[14px] leading-relaxed text-chalk-3">Seis modelos estadísticos, un auditor automático y un historial que no se borra. Probabilidades, no certezas.</p>
@@ -156,7 +156,7 @@ export default function App() {
             ))}
           </div>
           <div className="border-t border-white/[0.06]">
-            <p className="mx-auto max-w-[1240px] px-4 py-5 text-[12.5px] text-chalk-3 sm:px-6 lg:px-8">Apuesta con responsabilidad · Solo mayores de 18 años · Fuentes: football-data.co.uk, ESPN, martj42/international_results.</p>
+            <p className="mx-auto max-w-[1560px] px-4 py-5 text-[12.5px] text-chalk-3 sm:px-6 lg:px-8">Apuesta con responsabilidad · Solo mayores de 18 años · Fuentes: football-data.co.uk, ESPN, martj42/international_results.</p>
           </div>
         </footer>
 

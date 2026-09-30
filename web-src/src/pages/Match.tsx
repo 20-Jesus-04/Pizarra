@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, Calculator, Gavel, Info, ShieldCheck, ShieldAlert } from "lucide-react";
 import { BY_ID, DATA, LG, GROUPS, MK_NAMES, allSelections, compName, dayKey, dayLabel, fTime, fair, isLive, isPlayed, keyFacts, marketRows, odd, pct, picksFor, unpack, verdict } from "@/lib/data";
-import { Accordion, Badge, FormDots, Meter, Pitch, Reveal, Ring, SectionHead, Tabs, Ticket } from "@/components/ui-pz";
+import { Accordion, Badge, FormDots, HA, Meter, Pitch, Reveal, Ring, SectionHead, Tabs, Ticket } from "@/components/ui-pz";
 import { JugadorCard, OportunidadCard } from "@/components/oport";
 
 const bold = (s: string) => s.split(/\*\*(.+?)\*\*/g).map((t, i) => (i % 2 ? <b key={i} className="text-chalk">{t}</b> : t));
@@ -12,7 +12,7 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
   const [tab, setTab] = useState("resumen");
   if (!p || isPlayed(p)) {
     return (
-      <div className="mx-auto max-w-[1180px] px-5 py-16 md:px-8">
+      <div className="mx-auto max-w-[1560px] px-5 py-16 md:px-8">
         <a href="#partidos" className="inline-flex items-center gap-2 font-semibold text-chalk-2"><ArrowLeft className="h-4 w-4" /> Partidos</a>
         <h1 id="titulo" tabIndex={-1} className="mt-6 text-[36px] font-black">{p ? `${p.local} vs ${p.visita} ya se jugó` : "Este partido ya no está en la lista"}</h1>
         <p className="mt-3 text-chalk-2">Solo mostramos partidos de hoy en adelante.</p>
@@ -26,7 +26,7 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
   const cells: [string, number, string][] = [["1", x["1"], `Gana ${p.local}`], ["X", x.X, "Empate"], ["2", x["2"], `Gana ${p.visita}`]];
 
   return (
-    <div className="mx-auto w-full max-w-[1240px] px-4 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1560px] px-4 sm:px-6 lg:px-8">
       <nav aria-label="Ruta" className="mt-5 flex flex-wrap items-center gap-1.5 text-[13px] text-chalk-3">
         <a href={backTo} className="inline-flex items-center gap-1.5 font-semibold text-chalk-2 hover:text-chalk"><ArrowLeft className="h-4 w-4" />Partidos</a>
         <span aria-hidden="true">/</span><a href={`#partidos.${p.liga}`} className="hover:text-chalk">{LG[p.liga]?.name}</a>
@@ -57,6 +57,7 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
                 <Badge name={t} size={56} />
                 {i === 0 ? <h1 id="titulo" tabIndex={-1} className="w-full text-[clamp(15px,3.4vw,34px)] font-black leading-tight [hyphens:auto]">{t}</h1>
                   : <h2 className="w-full text-[clamp(15px,3.4vw,34px)] font-black leading-tight [hyphens:auto]">{t}</h2>}
+                <HA side={i === 0 ? "L" : "V"} full neutral={p.neutral} />
                 <FormDots s={i === 0 ? p.perfil_local.forma : p.perfil_visita.forma} />
               </div>
             ))}
@@ -84,7 +85,7 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
         </div>
       </section>
 
-      <div className="mt-12 grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-12 grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] 2xl:gap-10">
       <div className="min-w-0">
       {/* OPORTUNIDADES */}
       <section>
@@ -92,8 +93,8 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
           <>
             <SectionHead eyebrow="Modelo · historial · recientes · jugadores · cuota" title={ops.length === 1 ? "La oportunidad de este partido" : `${ops.length} oportunidades en este partido`}
               sub="Picks que las cinco señales respaldan, ordenados por puntaje. La primera es la destacada del partido." />
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {ops.map((o: any, i: number) => <div key={o.clave} className="row-in" style={{ animationDelay: `${i * 0.06}s` }}><OportunidadCard o={o} /></div>)}
+            <div className="fit-grid">
+              {ops.map((o: any, i: number) => <div key={o.clave} className="row-in" style={{ animationDelay: `${i * 0.06}s` }}><OportunidadCard o={o} p={p} showMatch={false} /></div>)}
             </div>
           </>
         ) : (
@@ -107,7 +108,7 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
         {jugOps.length > 0 && (
           <div className="mt-8">
             <h3 className="mb-3 text-[18px] font-extrabold">Oportunidades de jugadores</h3>
-            <div className="grid gap-4 sm:grid-cols-2">{jugOps.map((o: any, i: number) => <JugadorCard key={i} o={o} />)}</div>
+            <div className="fit-grid">{jugOps.map((o: any, i: number) => <JugadorCard key={i} o={o} side={o.equipo === p.local ? "L" : "V"} />)}</div>
           </div>
         )}
       </section>
@@ -140,16 +141,16 @@ const FIJA_LABEL: Record<string, string> = Object.fromEntries((DATA.fijas?.lista
 /** Resumen fijo al costado (escritorio): el ensamble, goles, árbitro, fijas y auditoría de un vistazo. */
 function Aside({ p }: { p: any }) {
   const m = p.mercados, x = m["1x2"];
-  const rows: [string, number, string][] = [[p.local, x["1"], "bg-cobalt"], ["Empate", x.X, "bg-white/30"], [p.visita, x["2"], "bg-turf"]];
+  const rows: [string, number, string, string][] = [[p.local, x["1"], "bg-cobalt", "L"], ["Empate", x.X, "bg-white/30", ""], [p.visita, x["2"], "bg-turf", "V"]];
   return (
     <aside className="hidden xl:block">
       <div className="sticky top-[88px] flex flex-col gap-4">
         <div className="spot card p-5">
           <div className="eyebrow">Ensamble de 6 modelos</div>
           <div className="mt-4 flex flex-col gap-3">
-            {rows.map(([l, v, c]) => (
+            {rows.map(([l, v, c, side]) => (
               <div key={l}>
-                <div className="mb-1 flex justify-between gap-3 text-[13.5px]"><span className="truncate">{l}</span><b className="num">{pct(v)}</b></div>
+                <div className="mb-1 flex items-center justify-between gap-3 text-[13.5px]"><span className="flex min-w-0 items-center gap-1.5">{side && <HA side={side} />}<span className="truncate">{l}</span></span><b className="num">{pct(v)}</b></div>
                 <Meter p={v} color={c} />
               </div>
             ))}
@@ -229,7 +230,7 @@ function Modelos({ p }: { p: any }) {
         <p className="mt-1 text-[13.5px] text-chalk-3">Cada uno da su 1X2; el ensamble los combina con los pesos calibrados contra partidos ya jugados.</p>
         <div className="-mx-2 mt-4 overflow-x-auto">
           <table className="pz">
-            <thead><tr><th>Modelo</th><th className="n">{p.local}</th><th className="n">Empate</th><th className="n">{p.visita}</th><th className="n">+2.5</th><th className="n">Peso</th></tr></thead>
+            <thead><tr><th>Modelo</th><th className="n"><span className="inline-flex items-center gap-1"><HA side="L" />{p.local}</span></th><th className="n">Empate</th><th className="n"><span className="inline-flex items-center gap-1"><HA side="V" />{p.visita}</span></th><th className="n">+2.5</th><th className="n">Peso</th></tr></thead>
             <tbody>
               {L.map((m: any) => (
                 <tr key={m.clave}><td>{N[m.clave] || m.clave}</td><td className="n">{pct(m["1"])}</td><td className="n">{pct(m.X)}</td><td className="n">{pct(m["2"])}</td>
@@ -359,7 +360,7 @@ function Stats({ p }: { p: any }) {
       <div className="mt-4 flex flex-col gap-2">
         {pr.ultimos.map((m: any, i: number) => (
           <div key={i} style={{ animationDelay: `${i * 0.04}s` }} className="row-in grid grid-cols-[46px_16px_minmax(0,1fr)_auto_20px] items-center gap-2 text-[13.5px] sm:grid-cols-[52px_18px_minmax(0,1fr)_auto_20px] sm:text-[14px]">
-            <span className="num text-chalk-3">{m.fecha.slice(0, 5)}</span><span className="text-chalk-3">{m.cond}</span><span className="truncate">{m.rival}</span><span className="num font-semibold">{m.marcador}</span>
+            <span className="num text-chalk-3">{m.fecha.slice(0, 5)}</span><HA side={m.cond} /><span className="truncate">{m.rival}</span><span className="num font-semibold">{m.marcador}</span>
             <FormDots s={m.res} />
           </div>
         ))}
@@ -371,7 +372,7 @@ function Stats({ p }: { p: any }) {
     <div className="flex flex-col gap-5">
       <div className="card p-6">
         <h3 className="text-[20px] font-extrabold">Cara a cara esta temporada</h3>
-        <div className="mt-4 grid grid-cols-2 text-[14px] font-bold"><span className="text-cobalt">{p.local}</span><span className="text-right text-turf">{p.visita}</span></div>
+        <div className="mt-4 grid grid-cols-2 gap-3 text-[14px] font-bold"><span className="flex min-w-0 items-center gap-1.5 text-cobalt"><HA side="L" /><span className="truncate">{p.local}</span></span><span className="flex min-w-0 items-center justify-end gap-1.5 text-turf"><span className="truncate">{p.visita}</span><HA side="V" /></span></div>
         <div className="mt-3 flex flex-col gap-4">
           {items.length ? items.map(([lab, k, inv, u]) => {
             const a = +L[k], b = +V[k], mx = Math.max(a, b, 0.01);

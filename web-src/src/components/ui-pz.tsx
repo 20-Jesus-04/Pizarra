@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useInView, useMotionValue, useSpring, useTransform, animate, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Home as HomeIcon, Plane } from "lucide-react";
 import { hue, initials, pct, fTime, dayShort, dayKey, compName, isLive, type Pick } from "@/lib/data";
 
 export const ease = [0.22, 1, 0.36, 1] as const;
@@ -63,6 +64,21 @@ export function Badge({ name, size = 40 }: { name: string; size?: number }) {
   );
 }
 
+/** Distintivo de local o visita. Mismos colores que las barras 1X2: local azul, visita verde. */
+export function HA({ side, full = false, neutral = false, className = "" }: { side: "L" | "V" | string; full?: boolean; neutral?: boolean; className?: string }) {
+  const L = side === "L";
+  const label = (L ? "Local" : "Visitante") + (neutral ? " (cancha neutral)" : "");
+  const tone = L ? "bg-cobalt-soft text-cobalt ring-cobalt/35" : "bg-turf-soft text-turf ring-turf/35";
+  if (full) {
+    return (
+      <span title={label} className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-[0.08em] ring-1 ${tone} ${className}`}>
+        {L ? <HomeIcon className="h-3 w-3" aria-hidden="true" /> : <Plane className="h-3 w-3" aria-hidden="true" />}{L ? "Local" : "Visita"}{neutral ? " · neutral" : ""}
+      </span>
+    );
+  }
+  return <abbr title={label} className={`inline-grid h-[17px] w-[17px] shrink-0 place-items-center rounded-[5px] text-[10px] font-black no-underline ring-1 ${tone} ${className}`}>{L ? "L" : "V"}</abbr>;
+}
+
 export function FormDots({ s }: { s?: string }) {
   if (!s) return null;
   const c: Record<string, string> = { G: "bg-turf text-night-900", E: "bg-chalk-3 text-night-900", P: "bg-flare text-white" };
@@ -122,7 +138,7 @@ export function Ticket({ k, compact = false, featured = false }: { k: Pick; comp
             <span className="truncate">{compact ? (k.valor ? "Recomendada por valor" : "Alta probabilidad") : compName(p)}</span>
             {!compact && <span className="shrink-0">{isLive(p) ? "En juego" : `${dayShort(dayKey(p.fecha))} · ${fTime(p.fecha)}`}</span>}
           </div>
-          {!compact && <div className="text-[15px] font-bold">{p.local} <span className="font-medium text-night-600/60">vs</span> {p.visita}</div>}
+          {!compact && <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[15px] font-bold"><span>{p.local}</span><HA side="L" /><span className="font-medium text-night-600/60">vs</span><span>{p.visita}</span><HA side="V" /></div>}
           <div className={`font-display font-extrabold leading-[1.1] ${featured ? "text-[27px]" : "text-[21px]"}`} style={{ fontStretch: "112%" }}>{k.sel}</div>
           {k.valor && <span className="tag mt-1 self-start bg-night-900 text-gold">Con valor · +{((k.ev || 0) * 100).toFixed(0)}%</span>}
         </div>
@@ -206,23 +222,22 @@ export function PageHeader({ eyebrow, title, sub, actions, stats, crumbs }: {
 }) {
   const tone = { gold: "text-gold", turf: "text-turf", cobalt: "text-cobalt", flare: "text-flare" };
   return (
-    <header className="relative pb-8 pt-8 md:pb-10 md:pt-12">
+    <header className="relative pb-8 pt-8 md:pb-10 md:pt-10">
       <div className="pointer-events-none absolute -top-10 left-1/3 h-48 w-[60%] -translate-x-1/2 rounded-full bg-cobalt/10 blur-[90px]" />
       {crumbs && (
         <nav aria-label="Ruta" className="relative mb-4 flex flex-wrap items-center gap-1.5 text-[13px] text-chalk-3">
           {crumbs.map(([t, h], i) => <span key={h} className="flex items-center gap-1.5">{i > 0 && <span aria-hidden="true">/</span>}<a href={h} className="hover:text-chalk">{t}</a></span>)}
         </nav>
       )}
-      <div className="relative flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
+      <div className={`relative grid gap-x-10 gap-y-5 ${stats?.length || actions ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:items-end 2xl:grid-cols-[minmax(0,1fr)_minmax(0,560px)]" : ""}`}>
         <div className="min-w-0 max-w-[760px]">
           {eyebrow && <div className="eyebrow flex items-center gap-2"><span className="h-px w-6 bg-gold" />{eyebrow}</div>}
-          <h1 id="titulo" tabIndex={-1} className="mt-3 text-[clamp(34px,6vw,64px)] font-black leading-[0.98]">{title}</h1>
+          <h1 id="titulo" tabIndex={-1} className="mt-3 text-[clamp(34px,5.4vw,60px)] font-black leading-[0.98]">{title}</h1>
           {sub && <div className="mt-4 max-w-[68ch] text-[15.5px] leading-relaxed text-chalk-2 md:text-[17px]">{sub}</div>}
         </div>
-        {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
-      </div>
+        {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto lg:justify-end">{actions}</div>}
       {stats && stats.length > 0 && (
-        <div className="relative mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="relative mt-3 grid grid-cols-2 gap-3 md:grid-cols-4 lg:mt-0 lg:grid-cols-2">
           {stats.map((st, i) => (
             <div key={i} className="spot lift rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-3.5 backdrop-blur">
               <div className={`font-display text-[clamp(22px,3.2vw,30px)] font-black leading-none ${st.tone ? tone[st.tone] : ""}`} style={{ fontStretch: "118%" }}>{st.v}</div>
@@ -231,11 +246,12 @@ export function PageHeader({ eyebrow, title, sub, actions, stats, crumbs }: {
           ))}
         </div>
       )}
+      </div>
     </header>
   );
 }
 
 /** Contenedor de página con ancho y márgenes consistentes. */
 export function Page({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`mx-auto w-full max-w-[1240px] px-4 pb-24 sm:px-6 lg:px-8 ${className}`}>{children}</div>;
+  return <div className={`mx-auto w-full max-w-[1560px] px-4 pb-24 sm:px-6 lg:px-8 ${className}`}>{children}</div>;
 }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, BarChart3, BookOpen, Coins, History, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
-import { BY_ID, DATA, LG, MATCHES, NOW, OPS, longDate, topPicks, pct, compName } from "@/lib/data";
+import { BY_ID, DATA, LG, MATCHES, NOW, OPS, TODAY, dayKey, longDate, topPicks, pct, compName } from "@/lib/data";
 import { Counter, Pitch, Reveal, SectionHead, Ticket } from "@/components/ui-pz";
 import { OportunidadCard } from "@/components/oport";
 
@@ -17,6 +17,7 @@ export default function Home() {
   const words = ["Apuesta", "con", "datos,"];
   const R = DATA.resultados || {};
   const fijasHoy = (DATA.fijas?.lista || []).filter((f: any) => new Date(f.fecha).getTime() > NOW).slice(0, 3);
+  const hoy = MATCHES.filter((p) => dayKey(p.fecha) === TODAY);
 
   return (
     <>
@@ -25,12 +26,12 @@ export default function Home() {
         <motion.div style={reduce ? {} : { y: yPitch }} className="absolute inset-0"><Pitch /></motion.div>
         <div className="pointer-events-none absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-cobalt/20 blur-[120px]" />
         <div className="pointer-events-none absolute -bottom-52 right-0 h-[480px] w-[480px] rounded-full bg-gold/10 blur-[120px]" />
-        <div className="relative mx-auto grid max-w-[1240px] items-center gap-12 px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-14 lg:grid-cols-[1.12fr_.88fr] lg:px-8 lg:pb-24 lg:pt-20">
-          <div>
+        <div className="relative mx-auto grid max-w-[1560px] items-center gap-10 px-4 pb-14 pt-10 sm:px-6 sm:pt-14 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,.9fr)] lg:gap-14 lg:px-8 lg:pb-20 lg:pt-16">
+          <div className="cq min-w-0">
             <div className="enter inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12.5px] font-semibold text-chalk-2">
               <span className="live-dot h-2 w-2 rounded-full bg-turf" /> <span className="truncate">Actualizado el {longDate(DATA.generado)} · {MATCHES.length} partidos</span>
             </div>
-            <h1 id="titulo" tabIndex={-1} className="mt-6 text-[clamp(40px,7.4vw,86px)] font-black leading-[0.95]">
+            <h1 id="titulo" tabIndex={-1} className="hero-title mt-6 font-black leading-[0.95]">
               {words.map((w, i) => (
                 <span key={w} className="enter mr-[0.22em] inline-block" style={{ animationDelay: `${0.1 + i * 0.09}s`, ["--dy" as any]: "0.45em" }}>{w}</span>
               ))}
@@ -66,7 +67,16 @@ export default function Home() {
               <div className="mb-3 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.14em] text-gold"><Sparkles className="h-4 w-4" /> La oportunidad destacada</div>
               <div className="absolute -inset-6 -z-0 rounded-[32px] bg-gold/10 blur-2xl" />
               <div className="relative"><Ticket k={hero} featured /></div>
-              <p className="mt-4 text-[13px] text-chalk-3">Toca el ticket para ver el análisis completo del partido.</p>
+              <div className="mt-5 grid grid-cols-3 gap-2.5">
+                {[[hoy.length, "partidos hoy", ""], [hoy.reduce((s, p) => s + (p.oportunidades || []).length, 0), "oportunidades hoy", "text-turf"],
+                  [(DATA.fijas?.lista || []).filter((f: any) => hoy.some((p) => p.id === f.id)).length, "fijas hoy", "text-gold"]].map(([v, l, c]) => (
+                  <a key={l as string} href={l === "partidos hoy" ? "#partidos" : "#oportunidades"} className="spot lift rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2.5 backdrop-blur">
+                    <div className={`num text-[20px] font-semibold leading-none ${c}`}>{v as number}</div>
+                    <div className="mt-1 text-[11.5px] leading-tight text-chalk-3">{l as string}</div>
+                  </a>
+                ))}
+              </div>
+              <p className="mt-3 text-[13px] text-chalk-3">Toca el ticket para ver el análisis completo del partido.</p>
             </div>
           )}
         </div>
@@ -89,7 +99,7 @@ export default function Home() {
 
       {/* OPORTUNIDADES */}
       {fijasHoy.length > 0 && (
-        <section className="mx-auto max-w-[1240px] px-4 pt-16 sm:px-6 lg:px-8">
+        <section className="mx-auto max-w-[1560px] px-4 pt-12 sm:px-6 lg:px-8 lg:pt-16">
           <Reveal><SectionHead eyebrow="Todas las señales confirman" title="Fijas de los próximos días" sub="Oportunidades donde el modelo, el historial, los últimos partidos, los jugadores y la cuota coinciden. A cualquier cuota."
             action={<a href="#fijas" className="inline-flex items-center gap-1.5 font-bold text-gold hover:underline">Ver todas <ArrowRight className="h-4 w-4" /></a>} /></Reveal>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -100,7 +110,7 @@ export default function Home() {
         </section>
       )}
 
-      <section className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <section className="mx-auto max-w-[1560px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <Reveal><SectionHead eyebrow="Modelo · historial · recientes · jugadores · cuota" title="Las mejores oportunidades" sub="La mejor de cada partido de los próximos días, respaldada por las cinco señales. Toca cualquiera para ver el porqué."
           action={<a href="#oportunidades" className="inline-flex items-center gap-1.5 font-bold text-gold hover:underline">Ver todas ({OPS.length}) <ArrowRight className="h-4 w-4" /></a>} /></Reveal>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -110,7 +120,7 @@ export default function Home() {
 
       {/* CÓMO FUNCIONA */}
       <section className="border-y border-white/5 bg-night-850/60">
-        <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+        <div className="mx-auto max-w-[1560px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
           <Reveal><SectionHead eyebrow="Cómo se usa" title="Tres pasos. Cero estadística." sub="Está hecho para decidir rápido, no para estudiar." /></Reveal>
           <div className="grid gap-5 md:grid-cols-3">
             {[
@@ -132,7 +142,7 @@ export default function Home() {
       </section>
 
       {/* LIGAS */}
-      <section className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <section className="mx-auto max-w-[1560px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <Reveal><SectionHead eyebrow="7 competiciones" title="Elige tu liga" /></Reveal>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           {Object.entries(LG).map(([c, l]: any) => (
@@ -147,7 +157,7 @@ export default function Home() {
 
       {/* TRANSPARENCIA */}
       <section className="border-y border-white/5 bg-night-850/60">
-        <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+        <div className="mx-auto max-w-[1560px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
           <Reveal><SectionHead eyebrow="Transparencia" title="Todo queda registrado" sub="Cada pronóstico se guarda antes del partido y se liquida después, acierte o falle." /></Reveal>
           <div className="grid gap-4 md:grid-cols-3">
             {[
@@ -168,7 +178,7 @@ export default function Home() {
       </section>
 
       {/* CONFIANZA */}
-      <section className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[1560px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <Reveal><SectionHead eyebrow="Los números" title="Por qué confiar" sub="Cada número se probó contra partidos que el modelo no había visto."
           action={<a href="#resultados" className="inline-flex items-center gap-1.5 font-bold text-gold hover:underline">Ver resultados <ArrowRight className="h-4 w-4" /></a>} /></Reveal>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
