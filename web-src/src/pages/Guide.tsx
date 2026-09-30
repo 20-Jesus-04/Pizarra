@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { DATA } from "@/lib/data";
-import { Accordion, Reveal, Ring } from "@/components/ui-pz";
+import { Accordion, Page, PageHeader, Reveal, Ring } from "@/components/ui-pz";
 
 const LESSONS = [
   { k: "Probabilidad", t: "Qué tan seguido pasa", d: "Un 70% significa que, si el partido se jugara 10 veces, eso pasaría unas 7. Nunca es una garantía.", ex: <>"Más de 1.5 goles: <b>78%</b>" falla más o menos 1 de cada 5 veces.</>, p: 0.78 },
@@ -14,25 +14,21 @@ export default function Guide() {
   const [i, setI] = useState(0);
   const L = LESSONS[i];
   return (
-    <div className="mx-auto max-w-[1180px] px-5 pb-20 md:px-8">
-      <div className="pt-10">
-        <div className="eyebrow">Guía rápida</div>
-        <h1 id="titulo" tabIndex={-1} className="mt-2 max-w-[18ch] text-[clamp(36px,5vw,56px)] font-black leading-[1.02]">Aprende a usar Pizarra en 2 minutos</h1>
-        <p className="mt-4 max-w-[56ch] text-[17px] text-chalk-2">Cuatro ideas. Tócalas en orden.</p>
-      </div>
+    <Page>
+      <PageHeader eyebrow="Guía rápida" crumbs={[["Método", "#metodo"], ["Guía", "#guia"]]} title="Aprende a usar Pizarra en 2 minutos" sub="Cuatro ideas. Tócalas en orden." />
 
-      <div className="mt-10 grid gap-6 lg:grid-cols-[320px_1fr]">
-        <div className="flex flex-col gap-2" role="group" aria-label="Lecciones">
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0" role="group" aria-label="Lecciones">
           {LESSONS.map((l, k) => (
             <button key={l.k} aria-pressed={k === i} onClick={() => setI(k)}
-              className={`relative flex items-center gap-4 rounded-2xl px-5 py-4 text-left transition ${k === i ? "text-night-900" : "text-chalk-2 hover:bg-white/5"}`}>
+              className={`relative flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-left transition lg:gap-4 lg:px-5 lg:py-4 ${k === i ? "text-night-900" : "text-chalk-2 hover:bg-white/5"}`}>
               {k === i && <motion.span layoutId="lesson" className="absolute inset-0 rounded-2xl bg-gold" transition={{ type: "spring", stiffness: 420, damping: 36 }} />}
               <span className={`relative grid h-9 w-9 place-items-center rounded-full font-display text-[16px] font-black ${k === i ? "bg-night-900 text-gold" : "bg-white/10"}`}>{k + 1}</span>
               <span className="relative text-[16px] font-bold">{l.k}</span>
             </button>
           ))}
         </div>
-        <div className="card relative min-h-[300px] overflow-hidden p-8">
+        <div className="spot card relative min-h-[300px] overflow-hidden p-5 sm:p-8">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cobalt/15 blur-3xl" />
           <div key={i} className="page-in relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
               <div>
@@ -43,7 +39,7 @@ export default function Guide() {
                 {i < LESSONS.length - 1 ? <button onClick={() => setI(i + 1)} className="mt-6 font-bold text-gold hover:underline">Siguiente: {LESSONS[i + 1].k} →</button>
                   : <a href="#partidos" className="mt-6 inline-block rounded-full bg-gold px-5 py-3 font-bold text-night-900">Listo, ver partidos →</a>}
               </div>
-              <Ring key={i} p={L.p} size={150} stroke={11} color={i === 2 ? "#2FE0A0" : "#FFC23D"} label={<span className="num text-[30px] font-semibold">{Math.round(L.p * 100)}%</span>} />
+              <Ring key={i} p={L.p} size={140} stroke={11} color={i === 2 ? "#2FE0A0" : "#FFC23D"} label={<span className="num text-[30px] font-semibold">{Math.round(L.p * 100)}%</span>} />
           </div>
         </div>
       </div>
@@ -67,6 +63,6 @@ export default function Guide() {
         </Accordion>
         <p className="mt-6 text-[13px] text-chalk-3">Fuentes: football-data.co.uk, ESPN y la base de resultados internacionales de martj42. Datos del {new Date(DATA.generado).toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "long", timeStyle: "short" })}.</p>
       </section>
-    </div>
+    </Page>
   );
 }

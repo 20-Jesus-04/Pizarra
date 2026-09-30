@@ -76,12 +76,14 @@ export function favLabel(p: any) {
   return { t: "Parejo", kind: "even" as const };
 }
 
-function prettyAlt(p: any, l: string) {
+export function prettyAlt(p: any, l: string) {
   const map: Record<string, string> = {
     "Doble oportunidad 1X (local o empate)": `${p.local} o empate`, "Doble oportunidad X2 (visita o empate)": `${p.visita} o empate`,
     "Doble oportunidad 12 (no hay empate)": "Cualquiera gana (sin empate)", "Empate no apuesta: local": `${p.local} (si empata, te devuelven)`,
     "Empate no apuesta: visita": `${p.visita} (si empata, te devuelven)`, "Gana el local": `Gana ${p.local}`, "Gana la visita": `Gana ${p.visita}`,
     "Hándicap asiático local -1": `${p.local} gana por 2 o más`, "Hándicap asiático visita -1": `${p.visita} gana por 2 o más`,
+    "Local gana por 2 o más": `${p.local} gana por 2 o más`, "Visita gana por 2 o más": `${p.visita} gana por 2 o más`,
+    "Local no marca": `${p.local} no marca`, "Visita no marca": `${p.visita} no marca`, "Empate": "Empate",
   };
   return map[l] || l.replace(/^Local /, p.local + " ").replace(/^Visita /, p.visita + " ");
 }
@@ -99,19 +101,36 @@ export function picksFor(p: any): Pick[] {
   const score = (c: Pick) => (c.valor ? 2 + (c.ev || 0) : c.prob * Math.pow(1 / c.prob, 0.6) * (c.prob < 0.9 ? 1 : 0.7));
   return out.sort((a, b) => score(b) - score(a));
 }
+/** Todas las oportunidades de los partidos que aún no empiezan, con su partido. */
+export const OPS: { p: any; o: any }[] = MATCHES.filter((p) => !isLive(p)).flatMap((p) => (p.oportunidades || []).map((o: any) => ({ p, o })));
+export const opToPick = (p: any, o: any): Pick => ({ sel: prettyAlt(p, o.seleccion), prob: o.prob_real, fair: o.cuota_justa, casa: o.cuota_casa || undefined,
+  ev: o.ev ?? undefined, valor: !!(o.ev && o.ev > 0.03 && !o.valor_sospechoso), p });
+
+/** Las mejores oportunidades de los próximos días: primero las fijas, luego por puntaje; una por partido y variando de liga. */
 export function topPicks(n = 6): Pick[] {
+  const soonMs = 3.2 * 864e5;
+  let pool = OPS.filter(({ p }) => new Date(p.fecha).getTime() - NOW < soonMs);
+  if (pool.length < n) pool = OPS;
+  if (!pool.length) return legacyTopPicks(n);
+  const best = new Map<string, { p: any; o: any }>();
+  for (const x of pool) { const cur = best.get(x.p.id); if (!cur || x.o.puntaje > cur.o.puntaje) best.set(x.p.id, x); }
+  const list = [...best.values()].sort((a, b) => (b.o.fija ? 1 : 0) - (a.o.fija ? 1 : 0) || b.o.puntaje - a.o.puntaje || b.p.confianza - a.p.confianza);
+  const seen = new Set<string>(), res: Pick[] = [];
+  for (const { p, o } of list) {
+    const key = p.liga + p.competicion;
+    if (seen.has(key) && res.length < n - 1 && list.length > n * 2) continue;
+    seen.add(key); res.push(opToPick(p, o));
+    if (res.length === n) break;
+  }
+  return res;
+}
+
+function legacyTopPicks(n: number): Pick[] {
   const upcoming = MATCHES.filter((p) => !isLive(p));
   const soon = upcoming.filter((p) => new Date(p.fecha).getTime() - NOW < 3.2 * 864e5);
   const pool = (soon.length >= n ? soon : upcoming).flatMap((p) => { const k = picksFor(p)[0]; return k ? [k] : []; });
   pool.sort((a, b) => (b.valor ? 1 : 0) - (a.valor ? 1 : 0) || b.prob * Math.pow(b.fair, 0.6) - a.prob * Math.pow(a.fair, 0.6) || b.p.confianza - a.p.confianza);
-  const seen = new Set<string>(), res: Pick[] = [];
-  for (const k of pool) {
-    const key = k.p.liga + k.p.competicion;
-    if (seen.has(key) && res.length < n - 1 && pool.length > n * 2) continue;
-    seen.add(key); res.push(k);
-    if (res.length === n) break;
-  }
-  return res;
+  return pool.slice(0, n);
 }
 
 export function keyFacts(p: any): string[] {

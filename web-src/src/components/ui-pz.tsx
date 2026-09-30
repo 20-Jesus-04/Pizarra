@@ -5,15 +5,9 @@ import { hue, initials, pct, fTime, dayShort, dayKey, compName, isLive, type Pic
 
 export const ease = [0.22, 1, 0.36, 1] as const;
 
-/** Aparece al entrar en pantalla (arranca visible si el usuario prefiere menos movimiento). */
-export function Reveal({ children, delay = 0, y = 18, className = "" }: { children: ReactNode; delay?: number; y?: number; className?: string }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div className={className} initial={reduce ? false : { opacity: 0, y }} whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-40px" }} transition={{ duration: 0.6, delay, ease }}>
-      {children}
-    </motion.div>
-  );
+/** Aparece al entrar en pantalla con CSS nativo (scroll-driven). Sin soporte, el contenido simplemente está. */
+export function Reveal({ children, className = "" }: { children: ReactNode; delay?: number; y?: number; className?: string }) {
+  return <div className={`reveal ${className}`}>{children}</div>;
 }
 
 export const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
@@ -24,25 +18,25 @@ export function Counter({ to, decimals = 0, suffix = "", prefix = "" }: { to: nu
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
   const reduce = useReducedMotion();
-  const [v, setV] = useState(reduce ? to : 0);
+  const [v, setV] = useState(to);
   useEffect(() => {
     if (!inView || reduce) return;
     const c = animate(0, to, { duration: 1.4, ease, onUpdate: setV });
-    return () => c.stop();
+    const t = setTimeout(() => setV(to), 1700);   // si el navegador pausa la animación, igual termina en el valor real
+    return () => { c.stop(); clearTimeout(t); };
   }, [inView, to, reduce]);
   return <span ref={ref} className="num">{prefix}{v.toLocaleString("es-PE", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</span>;
 }
 
-/** Anillo de probabilidad animado. */
+/** Anillo de probabilidad: el valor final está en el estilo; la animación CSS solo parte de vacío. */
 export function Ring({ p, size = 64, stroke = 6, color = "#6C7BFF", label }: { p: number; size?: number; stroke?: number; color?: string; label?: ReactNode }) {
   const r = (size - stroke) / 2, c = 2 * Math.PI * r;
   return (
     <div className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(238,242,255,.09)" strokeWidth={stroke} />
-        <motion.circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-          strokeDasharray={c} initial={{ strokeDashoffset: c }} whileInView={{ strokeDashoffset: c * (1 - p) }} viewport={{ once: true }}
-          transition={{ duration: 1.2, ease }} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" className="ring-fill"
+          strokeDasharray={c} style={{ strokeDashoffset: c * (1 - Math.max(0, Math.min(1, p))), ["--c" as any]: c, filter: `drop-shadow(0 0 6px ${color}66)` }} />
       </svg>
       <div className="absolute inset-0 grid place-items-center">{label ?? <span className="num text-[15px] font-semibold">{pct(p)}</span>}</div>
     </div>
@@ -52,8 +46,7 @@ export function Ring({ p, size = 64, stroke = 6, color = "#6C7BFF", label }: { p
 export function Meter({ p, color = "bg-cobalt", className = "" }: { p: number; color?: string; className?: string }) {
   return (
     <div className={`h-1.5 overflow-hidden rounded-full bg-white/[0.07] ${className}`}>
-      <motion.div className={`h-full rounded-full ${color}`} initial={{ width: 0 }} whileInView={{ width: `${Math.min(100, p * 100)}%` }}
-        viewport={{ once: true }} transition={{ duration: 0.9, ease }} />
+      <div className={`grow-x h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, p * 100))}%` }} />
     </div>
   );
 }
@@ -77,8 +70,8 @@ export function FormDots({ s }: { s?: string }) {
   return (
     <span className="inline-flex gap-1">
       {[...s].slice(-5).map((x, i) => (
-        <motion.i key={i} title={t[x]} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 + i * 0.06, type: "spring", stiffness: 400, damping: 18 }}
-          className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] text-[9.5px] font-black not-italic ${c[x] || ""}`}>{x}</motion.i>
+        <i key={i} title={t[x]} style={{ animationDelay: `${0.3 + i * 0.06}s` }}
+          className={`pop-in grid h-[18px] w-[18px] place-items-center rounded-[5px] text-[9.5px] font-black not-italic ${c[x] || ""}`}>{x}</i>
       ))}
     </span>
   );
@@ -143,7 +136,7 @@ export function Ticket({ k, compact = false, featured = false }: { k: Pick; comp
             <div className="mt-1 text-[10.5px] font-bold tracking-[0.08em] text-night-600/60">PROBABILIDAD</div>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-night-900/10">
-            <motion.div className="h-full rounded-full bg-cobalt-deep" initial={{ width: 0 }} whileInView={{ width: `${k.prob * 100}%` }} viewport={{ once: true }} transition={{ duration: 1, ease, delay: 0.2 }} />
+            <div className="grow-x h-full rounded-full bg-cobalt-deep" style={{ width: `${k.prob * 100}%` }} />
           </div>
           <div className="text-right text-[11.5px] font-semibold text-night-600/60">
             {k.casa ? "Casa" : "Cuota justa"}
@@ -184,24 +177,65 @@ export function Accordion({ title, sub, children, defaultOpen = false }: { title
     <div className="card overflow-hidden">
       <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-4 px-5 py-4 text-left">
         <div className="flex-1"><div className="text-[16px] font-bold">{title}</div>{sub && <div className="text-[13px] text-chalk-3">{sub}</div>}</div>
-        <motion.span animate={{ rotate: open ? 45 : 0 }} className="grid h-8 w-8 place-items-center rounded-full bg-white/5 text-[20px] text-chalk-2" aria-hidden="true">+</motion.span>
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/5 text-[20px] text-chalk-2 transition-transform duration-300 ${open ? "rotate-45" : ""}`} aria-hidden="true">+</span>
       </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.35, ease }}>
-            <div className="px-5 pb-5">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="acc" data-open={open}>
+        <div><div className="px-5 pb-5" hidden={!open}>{children}</div></div>
+      </div>
     </div>
   );
 }
 
-export function SectionHead({ title, sub, action }: { title: string; sub?: string; action?: ReactNode }) {
+export function SectionHead({ title, sub, action, eyebrow }: { title: string; sub?: string; action?: ReactNode; eyebrow?: string }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-      <div><h2 className="text-[clamp(26px,3.6vw,38px)] font-extrabold leading-none">{title}</h2>{sub && <p className="mt-2 max-w-[58ch] text-chalk-2">{sub}</p>}</div>
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0">
+        {eyebrow && <div className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-6 bg-gold" />{eyebrow}</div>}
+        <h2 className="text-[clamp(24px,3.6vw,38px)] font-extrabold leading-[1.05]">{title}</h2>
+        {sub && <p className="mt-2 max-w-[60ch] text-[15px] text-chalk-2 md:text-[16px]">{sub}</p>}
+      </div>
       {action}
     </div>
   );
+}
+
+/** Encabezado común de cada página: migas, título, bajada, acciones y cifras clave. */
+export function PageHeader({ eyebrow, title, sub, actions, stats, crumbs }: {
+  eyebrow?: string; title: ReactNode; sub?: ReactNode; actions?: ReactNode; crumbs?: [string, string][];
+  stats?: { v: ReactNode; l: string; tone?: "gold" | "turf" | "cobalt" | "flare" }[];
+}) {
+  const tone = { gold: "text-gold", turf: "text-turf", cobalt: "text-cobalt", flare: "text-flare" };
+  return (
+    <header className="relative pb-8 pt-8 md:pb-10 md:pt-12">
+      <div className="pointer-events-none absolute -top-10 left-1/3 h-48 w-[60%] -translate-x-1/2 rounded-full bg-cobalt/10 blur-[90px]" />
+      {crumbs && (
+        <nav aria-label="Ruta" className="relative mb-4 flex flex-wrap items-center gap-1.5 text-[13px] text-chalk-3">
+          {crumbs.map(([t, h], i) => <span key={h} className="flex items-center gap-1.5">{i > 0 && <span aria-hidden="true">/</span>}<a href={h} className="hover:text-chalk">{t}</a></span>)}
+        </nav>
+      )}
+      <div className="relative flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
+        <div className="min-w-0 max-w-[760px]">
+          {eyebrow && <div className="eyebrow flex items-center gap-2"><span className="h-px w-6 bg-gold" />{eyebrow}</div>}
+          <h1 id="titulo" tabIndex={-1} className="mt-3 text-[clamp(34px,6vw,64px)] font-black leading-[0.98]">{title}</h1>
+          {sub && <div className="mt-4 max-w-[68ch] text-[15.5px] leading-relaxed text-chalk-2 md:text-[17px]">{sub}</div>}
+        </div>
+        {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
+      </div>
+      {stats && stats.length > 0 && (
+        <div className="relative mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {stats.map((st, i) => (
+            <div key={i} className="spot lift rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-3.5 backdrop-blur">
+              <div className={`font-display text-[clamp(22px,3.2vw,30px)] font-black leading-none ${st.tone ? tone[st.tone] : ""}`} style={{ fontStretch: "118%" }}>{st.v}</div>
+              <div className="mt-1.5 text-[12.5px] leading-snug text-chalk-3">{st.l}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </header>
+  );
+}
+
+/** Contenedor de página con ancho y márgenes consistentes. */
+export function Page({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`mx-auto w-full max-w-[1240px] px-4 pb-24 sm:px-6 lg:px-8 ${className}`}>{children}</div>;
 }

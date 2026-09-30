@@ -24,7 +24,7 @@ from .markets import all_markets
 from .model import DixonColes
 from .modelos import (BayesModel, EloModel, PoissonModel, build_features, elo_run, implied_rates_fast, probs_from_rates,
                       train_xgb, trainable, _neutral)
-from .picks import PICK_LABELS, get, levels, settle
+from .picks import BANDS, PICK_LABELS, get, levels, settle
 from .stats import rate_model
 
 MODELOS = ["poisson", "dixon_coles", "elo", "bayes", "mercado", "xgboost"]
@@ -33,8 +33,7 @@ NOMBRES = {"poisson": "Poisson", "dixon_coles": "Dixon-Coles", "elo": "Elo", "ba
 O25 = ["poisson", "dixon_coles", "bayes", "mercado", "xgboost"]   # modelos que estiman goles totales
 CACHE = os.path.join(DATA_DIR, "modelo.json")
 MAX_AGE_DAYS = 6
-PICK_MIN = 0.55          # probabilidad mínima para guardar un pick simulado
-SUBTYPE_MIN = 0.70       # las estadísticas por subtipo se miden en la banda donde se eligen fijas
+PICK_MIN = 0.385         # probabilidad mínima para guardar un pick simulado (cuota justa hasta 2.60)
 
 
 def kwargs(code):
@@ -258,7 +257,7 @@ def simulate_picks(bt: pd.DataFrame) -> pd.DataFrame:
 
 
 def calibration(picks: pd.DataFrame) -> tuple[list, list]:
-    bins = np.r_[np.arange(0.55, 0.95, 0.05), 0.97, 1.0]
+    bins = np.r_[np.arange(0.40, 0.95, 0.05), 0.97, 1.0]
     tab, xs, ys, ws = [], [], [], []
     for a, b in zip(bins[:-1], bins[1:]):
         m = (picks.p >= a) & (picks.p < b)
@@ -271,14 +270,28 @@ def calibration(picks: pd.DataFrame) -> tuple[list, list]:
 
 
 def subtype_stats(picks: pd.DataFrame) -> dict:
-    p = picks[picks.p >= SUBTYPE_MIN].sort_values("date")
+    """Por nivel de cuota (segura/media/alta) y por subtipo: casos, aciertos, probabilidad media declarada, últimos 10."""
     out = {}
-    for lvl in ("l1", "l2", "l3"):
-        d = {}
-        for k, g in p.groupby(lvl):
-            d[k] = {"n": int(len(g)), "aciertos": int(g.ok.sum()), "ultimos10": [int(x) for x in g.ok.values[-10:]],
-                    "prob_media": round(float(g.p.mean()), 3)}
-        out[lvl] = d
+    for band, lo, hi in BANDS:
+        p = picks[(picks.p >= lo) & (picks.p < hi)].sort_values("date")
+        out[band] = {}
+        for lvl in ("l1", "l2", "l3"):
+            d = {}
+            for k, g in p.groupby(lvl):
+                d[k] = {"n": int(len(g)), "aciertos": int(g.ok.sum()), "ultimos10": [int(x) for x in g.ok.values[-10:]],
+                        "prob_media": round(float(g.p.mean()), 3)}
+            out[band][lvl] = d
+    return out
+
+
+def band_summary(picks: pd.DataFrame) -> dict:
+    """Acierto real vs declarado de cada nivel en el backtest (lo que el usuario puede esperar)."""
+    out = {}
+    for band, lo, hi in BANDS:
+        g = picks[(picks.p >= lo) & (picks.p < hi)]
+        if len(g):
+            out[band] = {"n": int(len(g)), "declarada": round(float(g.p.mean()), 3), "real": round(float(g.ok.mean()), 3),
+                         "cuota_justa_media": round(float((1 / g.p).mean()), 2)}
     return out
 
 
@@ -315,9 +328,9 @@ def calibrar(leagues: dict, now=None, verbose=True, P=None) -> dict:
     refp = pd.concat(refs, ignore_index=True) if refs else pd.DataFrame()
     arb = validate_refs(refp) if not refp.empty else {"n": 0}
     arb["k"] = REF_K
-    out = {"version": 2, "fecha": now.isoformat(), "segundos": round(time.time() - t0),
+    out = {"version": 3, "fecha": now.isoformat(), "segundos": round(time.time() - t0),
            "pesos": pesos, "evaluacion": ev, "calibracion": tabla_cal, "curva": curva,
-           "subtipos": subtype_stats(picks), "picks_simulados": int(len(picks)),
+           "subtipos": subtype_stats(picks), "niveles": band_summary(picks), "picks_simulados": int(len(picks)),
            "acierto_simulado_70": round(float(picks.ok[picks.p >= 0.7].mean()), 4) if len(picks) else None,
            "ligas": ligas, "arbitros": arb, "nombres": NOMBRES}
     if P is not None:
@@ -346,7 +359,7 @@ def save_cache(c):
 
 
 def cache_is_fresh(c, now) -> bool:
-    if not c or c.get("version") != 2:
+    if not c or c.get("version") != 3:
         return False
     age = (now - datetime.fromisoformat(c["fecha"])).total_seconds() / 86400
     return age < MAX_AGE_DAYS

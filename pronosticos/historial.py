@@ -15,10 +15,10 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 
 from .fetch import DATA_DIR
-from .picks import LABEL, PICK_LABELS, get, levels, settle
+from .picks import BANDS, LABEL, PICK_LABELS, band_of, get, levels, settle
 
 PATH = os.path.join(DATA_DIR, "historial.json")
-GUARDAR_DESDE = 0.55        # se guardan todos los picks candidatos con prob >= 55% (para calibración real)
+GUARDAR_DESDE = 0.385       # se guardan todos los picks candidatos con prob >= 38.5% (para calibración real)
 
 
 def load() -> dict:
@@ -74,6 +74,8 @@ def registrar(h: dict, partidos: list, fijas: list, now: datetime) -> int:
             "arbitro": (p.get("arbitro") or {}).get("nombre"),
             "principal": alt[0]["clave"] if alt and alt[0].get("clave") else None,
             "fijas": fset.get(p["id"], []),
+            "destacada": (p.get("destacada") or {}).get("clave"),
+            "oportunidades": [o["clave"] for o in p.get("oportunidades") or []],
             "auditoria": (p.get("auditoria") or {}).get("estado"),
             "picks": picks, "resultado": old.get("resultado") if old else None,
         }
@@ -114,20 +116,22 @@ def _outcomes(rec):
     return out
 
 
-def subtipos_reales(h: dict, min_p=0.70) -> dict:
-    """Mismas estadísticas por subtipo que el backtest, pero con resultados reales."""
+def subtipos_reales(h: dict) -> dict:
+    """Mismas estadísticas por nivel y subtipo que el backtest, pero con resultados reales."""
     rows = []
     for rec in h["partidos"].values():
         for k, pr, ok in _outcomes(rec):
-            if pr >= min_p:
-                rows.append((rec["fecha"], tuple(k.split("|")), ok))
+            b = band_of(pr)
+            if b:
+                rows.append((rec["fecha"], b, tuple(k.split("|")), pr, ok))
     rows.sort()
-    out = {"l1": {}, "l2": {}, "l3": {}}
-    for _, path, ok in rows:
+    out = {b: {"l1": {}, "l2": {}, "l3": {}} for b, _, _ in BANDS}
+    for _, b, path, pr, ok in rows:
         for lvl, kk in zip(("l1", "l2", "l3"), levels(path)):
-            s = out[lvl].setdefault(kk, {"n": 0, "aciertos": 0, "ultimos10": []})
-            s["n"] += 1; s["aciertos"] += int(ok)
+            s = out[b][lvl].setdefault(kk, {"n": 0, "aciertos": 0, "ultimos10": [], "_sp": 0.0})
+            s["n"] += 1; s["aciertos"] += int(ok); s["_sp"] += pr
             s["ultimos10"] = (s["ultimos10"] + [int(ok)])[-10:]
+            s["prob_media"] = round(s["_sp"] / s["n"], 3)
     return out
 
 
@@ -156,7 +160,7 @@ def metricas(h: dict, now: datetime, lima_day) -> dict:
         out["n_con_mercado"] = int(len(ym))
     # calibración de todos los picks candidatos
     allp = [(pr, ok) for r in recs for _, pr, ok in _outcomes(r)]
-    bands = [(0.55, 0.6), (0.6, 0.7), (0.7, 0.8), (0.8, 0.9), (0.9, 1.01)]
+    bands = [(0.385, 0.5), (0.5, 0.6), (0.6, 0.7), (0.7, 0.8), (0.8, 0.9), (0.9, 1.01)]
     out["calibracion"] = []
     for a, b in bands:
         sel = [ok for pr, ok in allp if a <= pr < b]
@@ -165,7 +169,7 @@ def metricas(h: dict, now: datetime, lima_day) -> dict:
             out["calibracion"].append({"rango": f"{a * 100:.0f}-{min(b, 1) * 100:.0f}%", "declarada": round(float(np.mean(dec)), 3),
                                        "real": round(float(np.mean(sel)), 3), "n": len(sel)})
     # picks publicados: el principal de cada partido y las fijas
-    pub, fij = [], []
+    pub, fij, dest = [], [], []
     cut30 = now - timedelta(days=30)
     for r in recs:
         oc = {k: (pr, ok) for k, pr, ok in _outcomes(r)}
@@ -178,14 +182,25 @@ def metricas(h: dict, now: datetime, lima_day) -> dict:
             if k in oc:
                 pr, ok = oc[k]
                 fij.append({**base, "seleccion": LABEL.get(k, k), "prob": pr, "acierto": ok, "tipo": "fija"})
+        if r.get("destacada") in oc:
+            pr, ok = oc[r["destacada"]]
+            dest.append({**base, "seleccion": LABEL.get(r["destacada"], r["destacada"]), "prob": pr, "acierto": ok, "tipo": "destacada"})
+        for k in r.get("oportunidades") or []:
+            if k in oc and k != r.get("destacada"):
+                pr, ok = oc[k]
+                dest.append({**base, "seleccion": LABEL.get(k, k), "prob": pr, "acierto": ok, "tipo": "oportunidad"})
     stat = lambda L: {"n": len(L), "aciertos": sum(x["acierto"] for x in L),
                       "acierto": round(sum(x["acierto"] for x in L) / len(L), 4) if L else None}
     out["principal"] = stat(pub)
     out["principal_30d"] = stat([x for x in pub if _t(x["fecha"]) >= cut30])
     out["fijas"] = stat(fij)
     out["fijas_30d"] = stat([x for x in fij if _t(x["fecha"]) >= cut30])
+    esperado = lambda L: round(float(np.mean([x["prob"] for x in L])), 3) if L else None
+    out["fijas"]["esperado"] = esperado(fij)
+    out["fijas_30d"]["esperado"] = esperado([x for x in fij if _t(x["fecha"]) >= cut30])
+    out["oportunidades"] = {**stat(dest), "esperado": esperado(dest)}
     out["liquidados_30d"] = sum(1 for r in recs if _t(r["fecha"]) >= cut30 for _ in _outcomes(r))
-    out["ultimos"] = sorted(pub + fij, key=lambda x: x["fecha"], reverse=True)[:80]
+    out["ultimos"] = sorted(pub + fij + dest, key=lambda x: x["fecha"], reverse=True)[:100]
     # evolución diaria del acierto del pick principal
     by_day = defaultdict(lambda: [0, 0])
     for x in pub:

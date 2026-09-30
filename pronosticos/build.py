@@ -21,7 +21,7 @@ from .markets import all_markets
 from .stats import team_profile, head_to_head, standings, rate_model
 from .players import load_player_data, squad_projection, compact, PKEYS, team_stat_markets, team_rate_predictor
 from .picks import PICK_LABELS, get as _get
-from . import arbitros, auditor, ensamble, fijas, historial
+from . import arbitros, auditor, ensamble, historial, oportunidades
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -193,6 +193,14 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
     ref_tabs = referee_tables(leagues, rates_y, T)
     curva = cache.get("curva")
 
+    # historial: liquidar lo jugado; sus estadísticas reales alimentan las oportunidades
+    hist = historial.load()
+    n_liq = historial.liquidar(hist, load_results(), now)
+    res = historial.metricas(hist, now, lima_day)
+    estado = {"liquidados_30d": res.get("liquidados_30d", 0), "fijas_30d": res.get("fijas_30d") or {}}
+    estado["modo"] = "real" if estado["liquidados_30d"] >= oportunidades.VOLUMEN_30D else "calibracion"
+    reales = historial.subtipos_reales(hist)
+
     # 3) cada próximo partido
     for u in upcoming:
         dt = pd.Timestamp(u["date"]).to_pydatetime()
@@ -234,6 +242,7 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
                    "tarjetas_con_arbitro": round(sum(cards), 2) if cards else None}
         mk = all_markets(lam, mu, dc.rho, dc.ht_frac, corners, cards)
         jugadores = {"local": [], "visita": []}
+        sq_h = sq_a = []
         if T is not None:
             mk.update(team_stat_markets(T, code, u["home_espn"], u["away_espn"], neutral, yc_factor=fac))
         if P is not None:
@@ -241,8 +250,9 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
             sh_h = shp(u["home_espn"], u["away_espn"], True, neutral) if shp else None
             sh_a = shp(u["away_espn"], u["home_espn"], False, neutral) if shp else None
             ts = pd.Timestamp(now).tz_localize(None)
-            jugadores = {"local": compact(squad_projection(P, code, u["home_espn"], u["away_espn"], ts, lam, sh_h)),
-                         "visita": compact(squad_projection(P, code, u["away_espn"], u["home_espn"], ts, mu, sh_a))}
+            sq_h = squad_projection(P, code, u["home_espn"], u["away_espn"], ts, lam, sh_h)
+            sq_a = squad_projection(P, code, u["away_espn"], u["home_espn"], ts, mu, sh_a)
+            jugadores = {"local": compact(sq_h), "visita": compact(sq_a)}
 
         n_h = int(((df.home == u["home"]) | (df.away == u["home"])).sum())
         n_a = int(((df.home == u["away"]) | (df.away == u["away"])).sum())
@@ -292,6 +302,13 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
             "jugadores": jugadores,
             "forma_espn": u.get("espn_form"), "record_espn": u.get("espn_record"),
         })
+        # oportunidades: modelo + historial del pick + partidos recientes + jugadores + cuota
+        pj = out["partidos"][-1]
+        ctx = oportunidades.contexto(df, u["home"], u["away"], sq_h, sq_a, cache, reales, estado["modo"])
+        pj["oportunidades"] = oportunidades.analizar(pj, ctx)
+        pj["destacada"] = pj["oportunidades"][0] if pj["oportunidades"] else None
+        pj["oportunidades_jugador"] = oportunidades.oportunidades_jugador(
+            sq_h, sq_a, u["home_display"], u["away_display"], (cache.get("validacion_jugadores") or {}).get(code))
     out["partidos"].sort(key=lambda p: p["fecha"])
     # nombres en español para selecciones
     tr = lambda n: ES_NAMES.get(n, n)
@@ -307,13 +324,8 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
         for m in p["h2h"]["partidos"]:
             m["local"], m["visita"] = tr(m["local"]), tr(m["visita"])
 
-    # 4) historial: liquidar lo jugado, elegir fijas, registrar lo nuevo (antes del inicio)
-    hist = historial.load()
-    n_liq = historial.liquidar(hist, load_results(), now)
-    res = historial.metricas(hist, now, lima_day)
-    estado = {"liquidados_30d": res.get("liquidados_30d", 0), "fijas_30d_n": (res.get("fijas_30d") or {}).get("n", 0),
-              "fijas_30d_acierto": (res.get("fijas_30d") or {}).get("acierto")}
-    out["fijas"] = fijas.seleccionar(out["partidos"], cache, historial.subtipos_reales(hist), estado, now, lima_day)
+    # 4) fijas y registro en el historial (antes del inicio de cada partido)
+    out["fijas"] = oportunidades.fijas(out["partidos"], estado, now, lima_day)
     fset = {}
     for f in out["fijas"]["lista"]:
         fset.setdefault(f["id"], []).append(f["clave"])
@@ -322,11 +334,12 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
     n_reg = historial.registrar(hist, out["partidos"], out["fijas"]["lista"], now)
     historial.save(hist)
     out["resultados"] = historial.metricas(hist, now, lima_day)
-    print(f"Historial: {n_reg} predicciones registradas, {n_liq} liquidadas, {len(out['fijas']['lista'])} fijas")
+    n_op = sum(len(p["oportunidades"]) for p in out["partidos"])
+    print(f"Historial: {n_reg} predicciones registradas, {n_liq} liquidadas · {n_op} oportunidades · {len(out['fijas']['lista'])} fijas")
 
     # 5) transparencia: cómo está calibrado el motor
     out["metodologia"] = {k: cache.get(k) for k in ("fecha", "pesos", "evaluacion", "calibracion", "arbitros", "picks_simulados",
-                                                    "acierto_simulado_70", "nombres")}
+                                                    "acierto_simulado_70", "nombres", "niveles")}
     out["metodologia"]["arbitros_conocidos"] = {c: len(t) for c, t in ref_tabs.items()}
     write_web(out, out_dir)
     return out

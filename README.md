@@ -8,7 +8,7 @@ Motor de pronósticos de fútbol (Premier, LaLiga, Serie A, Bundesliga, Ligue 1,
 4. **Mercados**: el 1X2 y el over 2.5 del ensamble se convierten en una matriz de marcadores → más de 25 mercados + jugadores + estadísticas de equipo.
 5. **Árbitros**: las tarjetas esperadas se multiplican por el factor del árbitro (tarjetas reales / esperadas por los equipos, encogido hacia la media).
 6. **Auditor automático**: reglas que marcan cada pronóstico como ok / revisar / bloqueado.
-7. **Fijas**: filtro estricto (calibración, Beta-Binomial por subtipo, forma reciente, tope de correlación, pausa automática).
+7. **Oportunidades y fijas**: cada pick se cruza con 5 señales (modelo, historial de ese tipo de pick, últimos 8 partidos de ambos equipos, jugadores y cuota) y recibe un puntaje 0-100. Oportunidad: las señales lo respaldan (hasta 3 por partido, cuota justa 1.30-2.60). Fija: todo confirma, a cualquier cuota. También oportunidades de jugador donde la validación de jugadores lo respalda.
 8. **Historial**: cada predicción se registra antes del partido en `data/historial.json`, se liquida después y nunca se borra. La web muestra Brier, calibración y acierto reales.
 9. `docs/index.html`: web estática con todo lo anterior (Partidos, Fijas, Resultados, Ligas, Método).
 
@@ -39,14 +39,14 @@ Si alguna fuente bloquea los servidores de GitHub, ejecútalo en tu PC con el Pr
 | `config.py` `DAYS_AHEAD`, `LEAGUES`, `INT_COMPETITIONS` | Qué partidos y ligas se muestran |
 | `ensamble.py` `MAX_AGE_DAYS` | Cada cuántos días se recalibra el ensamble (6) |
 | `arbitros.py` `REF_K`, `REF_XI` | Cuánto se encoge el factor del árbitro y su memoria |
-| `fijas.py` | Umbrales de las fijas (calibrada ≥72%, límite creíble ≥65%, forma 6/10, topes) |
+| `oportunidades.py` | Pesos de las 5 señales, puntaje mínimo (65) y de fija (75), rango de cuotas, topes |
 
 `python -m pronosticos.build --recalibrar` fuerza el backtest del ensamble (≈2-3 min).
 
 ## Archivos
 
 - `fetch.py` descarga · `data.py` limpia y une fuentes · `model.py` Dixon-Coles · `modelos.py` Poisson, Bayes, Elo, XGBoost
-- `ensamble.py` backtest, pesos, calibración y motor · `arbitros.py` · `auditor.py` · `fijas.py` · `historial.py` · `picks.py`
+- `ensamble.py` backtest, pesos, calibración y motor · `arbitros.py` · `auditor.py` · `oportunidades.py` · `historial.py` · `picks.py`
 - `players.py` jugadores · `markets.py` mercados · `stats.py` forma/H2H/tabla · `backtest.py` métricas
 - `build.py` pipeline completo · `web-src/` la interfaz (compilada en `web/app.html`)
 
