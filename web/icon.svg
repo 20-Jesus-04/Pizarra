@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="cf-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#26325C"/>
+      <stop offset="1" stop-color="#080C18"/>
+    </linearGradient>
+    <linearGradient id="cf-ball" x1=".2" y1="0" x2=".8" y2="1">
+      <stop offset="0" stop-color="#FFD873"/>
+      <stop offset="1" stop-color="#E89B0C"/>
+    </linearGradient>
+    <clipPath id="cf-clip"><circle cx="30" cy="34" r="20"/></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#cf-bg)"/>
+  <circle cx="30" cy="34" r="20" fill="url(#cf-ball)"/>
+  <g clip-path="url(#cf-clip)" fill="#080C18" opacity=".16">
+    <path d="M30 25.5l8 5.8-3 9.4h-10l-3-9.4z"/>
+    <path d="M30 9l6 4.4-2.3 7.1h-7.4l-2.3-7.1z"/>
+    <path d="M53 27l2.3 7.1-6 4.4-6-4.4 2.3-7.1z"/>
+    <path d="M7 27l7.4 0 2.3 7.1-6 4.4-6-4.4z"/>
+    <path d="M18 50l6-4.4 6 4.4-2.3 7.1h-7.4z"/>
+    <path d="M42 50l-6-4.4-6 4.4 2.3 7.1h7.4z"/>
+  </g>
+  <path d="M19.5 34.5l8 8L52 15" fill="none" stroke="#080C18" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19.5 34.5l8 8L52 15" fill="none" stroke="#2FE0A0" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -15,7 +15,7 @@ export default function Guide() {
   const L = LESSONS[i];
   return (
     <Page>
-      <PageHeader eyebrow="Guía rápida" crumbs={[["Método", "#metodo"], ["Guía", "#guia"]]} title="Aprende a usar Pizarra en 2 minutos" sub="Cuatro ideas. Tócalas en orden." />
+      <PageHeader eyebrow="Guía rápida" crumbs={[["Método", "#metodo"], ["Guía", "#guia"]]} title="Aprende a usar CuchiFijas en 2 minutos" sub="Cuatro ideas. Tócalas en orden." />
 
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
         <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0" role="group" aria-label="Lecciones">
@@ -47,12 +47,12 @@ export default function Guide() {
       <section className="mt-16 grid gap-3">
         <Reveal><h2 className="mb-3 text-[clamp(26px,3.4vw,36px)] font-black">Preguntas frecuentes</h2></Reveal>
         <Accordion title="¿De dónde salen los números?" defaultOpen>
-          <p className="max-w-[70ch] leading-relaxed text-chalk-2">Para cada liga, Pizarra mide qué tan bueno es cada equipo atacando y defendiendo con miles de partidos reales, dando más peso a los recientes y teniendo en cuenta si juega de local. Con eso calcula la probabilidad de cada marcador posible, y de ahí salen todos los mercados. Cuando hay cuotas publicadas, las combina con el modelo porque las casas conocen noticias que los datos no tienen. En las pruebas, esa mezcla fue más precisa que cualquiera de los dos por separado.</p>
+          <p className="max-w-[70ch] leading-relaxed text-chalk-2">Para cada liga, CuchiFijas mide qué tan bueno es cada equipo atacando y defendiendo con miles de partidos reales, dando más peso a los recientes y teniendo en cuenta si juega de local. Con eso calcula la probabilidad de cada marcador posible, y de ahí salen todos los mercados. Cuando hay cuotas publicadas, las combina con el modelo porque las casas conocen noticias que los datos no tienen. En las pruebas, esa mezcla fue más precisa que cualquiera de los dos por separado.</p>
         </Accordion>
         <Accordion title="¿Y los jugadores?">
           <p className="max-w-[70ch] leading-relaxed text-chalk-2">Usa los minutos, tiros, goles, faltas y tarjetas de cada partido reciente de cada jugador, ajustados al rival. Así un delantero rinde más ante una defensa débil.</p>
         </Accordion>
-        <Accordion title="¿Qué no sabe Pizarra?">
+        <Accordion title="¿Qué no sabe CuchiFijas?">
           <ul className="list-disc space-y-1.5 pl-5 text-chalk-2"><li>Lesiones, sanciones y rotaciones de último minuto: revisa la alineación.</li><li>El árbitro: por eso las tarjetas son lo más difícil de anticipar.</li><li>La motivación: un equipo ya clasificado puede salir con suplentes.</li></ul>
         </Accordion>
         <Accordion title="¿Cada cuánto se actualiza?">

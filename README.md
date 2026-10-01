@@ -1,4 +1,4 @@
-# Pizarra de Pronósticos
+# CuchiFijas
 
 Motor de pronósticos de fútbol (Premier, LaLiga, Serie A, Bundesliga, Ligue 1, Liga 1 Perú, Champions femenina y selecciones: Nations League, eliminatorias, Copa América, Eurocopa, Mundial, Copa África, amistosos) que corre solo cada día:
 

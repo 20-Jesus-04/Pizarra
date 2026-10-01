@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { flushSync } from "react-dom";
 import { MotionConfig, motion, useScroll, useSpring } from "framer-motion";
 import { BarChart3, BookOpen, History, Home as HomeIcon, ShieldCheck, Trophy } from "lucide-react";
@@ -67,13 +67,27 @@ const NAV = [
 ] as const;
 const MOBILE = NAV.filter(([k]) => k !== "ligas");
 
+/** Mismo dibujo que el favicon (web/icon.svg): balón dorado con el check de la fija. */
 function Logo() {
+  const id = useId().replace(/:/g, "");
   return (
-    <a href="#inicio" className="flex shrink-0 items-center gap-2.5 font-display text-[19px] font-black tracking-wide sm:text-[20px]" style={{ fontStretch: "125%" }} aria-label="Pizarra, inicio">
-      <motion.svg whileHover={{ rotate: 90 }} transition={{ type: "spring", stiffness: 300 }} width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
-        <rect width="30" height="30" rx="9" fill="#1A2445" /><circle cx="15" cy="15" r="6" fill="none" stroke="#FFC23D" strokeWidth="2.2" /><path d="M15 4v22" stroke="#EEF2FF" strokeWidth="1.6" opacity=".5" /><circle cx="15" cy="15" r="1.8" fill="#FFC23D" />
+    <a href="#inicio" className="flex shrink-0 items-center gap-2 font-display text-[17px] font-black tracking-wide min-[360px]:text-[18px] sm:gap-2.5 sm:text-[20px]" style={{ fontStretch: "118%" }} aria-label="CuchiFijas, inicio">
+      <motion.svg whileHover={{ rotate: -12, scale: 1.08 }} transition={{ type: "spring", stiffness: 300 }} width="32" height="32" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id={`${id}b`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#26325C" /><stop offset="1" stopColor="#080C18" /></linearGradient>
+          <linearGradient id={`${id}g`} x1=".2" y1="0" x2=".8" y2="1"><stop offset="0" stopColor="#FFD873" /><stop offset="1" stopColor="#E89B0C" /></linearGradient>
+          <clipPath id={`${id}c`}><circle cx="30" cy="34" r="20" /></clipPath>
+        </defs>
+        <rect width="64" height="64" rx="15" fill={`url(#${id}b)`} />
+        <circle cx="30" cy="34" r="20" fill={`url(#${id}g)`} />
+        <g clipPath={`url(#${id}c)`} fill="#080C18" opacity=".16">
+          <path d="M30 25.5l8 5.8-3 9.4h-10l-3-9.4z" /><path d="M30 9l6 4.4-2.3 7.1h-7.4l-2.3-7.1z" /><path d="M53 27l2.3 7.1-6 4.4-6-4.4 2.3-7.1z" />
+          <path d="M7 27l7.4 0 2.3 7.1-6 4.4-6-4.4z" /><path d="M18 50l6-4.4 6 4.4-2.3 7.1h-7.4z" /><path d="M42 50l-6-4.4-6 4.4 2.3 7.1h7.4z" />
+        </g>
+        <path d="M19.5 34.5l8 8L52 15" fill="none" stroke="#080C18" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M19.5 34.5l8 8L52 15" fill="none" stroke="#2FE0A0" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" />
       </motion.svg>
-      PIZARRA
+      <span>CUCHI<span className="text-gold">FIJAS</span></span>
     </a>
   );
 }
@@ -91,7 +105,7 @@ export default function App() {
   if (view === "partidos") { page = <Matches lg={arg && LG[arg] ? arg : null} />; title = "Partidos"; }
   else if (view === "p") { page = <Match id={arg || ""} backTo={`#partidos${lastLg ? "." + lastLg : ""}`} />; const m = BY_ID[arg || ""]; title = m ? `${m.local} vs ${m.visita}` : "Partido"; }
   else if (view === "ligas" || view === "liga") { const c = arg && LG[arg] ? arg : "E0"; page = <Leagues code={c} />; title = LG[c]?.name; }
-  else if (view === "guia") { page = <Guide />; title = "Cómo usar Pizarra"; }
+  else if (view === "guia") { page = <Guide />; title = "Cómo usar CuchiFijas"; }
   else if (view === "fijas") { page = <Fijas key="f" />; title = "Fijas"; }
   else if (view === "oportunidades") { page = <Fijas key="o" tab="oportunidades" />; title = "Oportunidades"; }
   else if (view === "resultados") { page = <Resultados />; title = "Resultados"; }
@@ -99,7 +113,7 @@ export default function App() {
   else { page = <Home />; title = "Pronósticos con datos"; }
 
   useEffect(() => {
-    document.title = `${title} — Pizarra`;
+    document.title = `${title} — CuchiFijas`;
     const t = setTimeout(() => document.getElementById("titulo")?.focus({ preventScroll: true }), 350);
     return () => clearTimeout(t);
   }, [hash, title]);
@@ -129,8 +143,8 @@ export default function App() {
                 </a>
               ))}
             </nav>
-            <a href="#partidos" className="shine ml-auto inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-[13.5px] font-bold text-night-900 shadow-[0_8px_30px_-10px_rgba(255,194,61,.8)] sm:text-[14px] lg:ml-0">
-              <span className="live-dot h-1.5 w-1.5 rounded-full bg-night-900" />{MATCHES.length} partidos
+            <a href="#partidos" aria-label={`${MATCHES.length} partidos`} className="shine ml-auto inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-gold px-4 py-2 text-[13.5px] font-bold text-night-900 shadow-[0_8px_30px_-10px_rgba(255,194,61,.8)] sm:text-[14px] lg:ml-0">
+              <span className="live-dot h-1.5 w-1.5 rounded-full bg-night-900" />{MATCHES.length}<span className="-ml-1 hidden min-[360px]:inline"> partidos</span>
             </a>
           </div>
         </header>

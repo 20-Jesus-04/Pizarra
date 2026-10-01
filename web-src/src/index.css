@@ -129,8 +129,13 @@
 @keyframes vt-in { from { opacity: 0; transform: translateY(14px) } }
 
 /* título del inicio: se ajusta al ancho de su columna para no chocar con la tarjeta destacada */
-.hero-title { font-size: clamp(40px, 6.4vw, 80px); }
-@supports (font-size: 1cqw) { .hero-title { font-size: clamp(40px, 10.5cqw, 80px); } }
+.hero-title { font-size: clamp(30px, 6.4vw, 80px); }
+@media (max-width: 639px) { .hero-title { font-size: clamp(30px, 10.5vw, 44px); } }
+@supports (font-size: 1cqw) {
+  .hero-title { font-size: clamp(30px, 10.5cqw, 80px); }
+  /* en el teléfono la palabra más larga ("corazonadas") debe caber en el ancho de la columna */
+  @media (max-width: 639px) { .hero-title { font-size: clamp(30px, 11.5cqw, 46px); } }
+}
 
 /* componentes que se adaptan a su propio ancho */
 .cq { container-type: inline-size; }

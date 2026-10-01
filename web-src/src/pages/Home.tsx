@@ -41,7 +41,7 @@ export default function Home() {
             </h1>
             <p style={{ animationDelay: "0.55s" }}
               className="enter mt-6 max-w-[54ch] text-[clamp(16px,1.7vw,19px)] leading-relaxed text-chalk-2">
-              Pizarra calcula la probabilidad real de cada resultado en las 5 grandes ligas de Europa, la Liga 1, la Champions femenina y las selecciones, y te avisa cuando la cuota de tu casa paga más de lo que debería.
+              CuchiFijas calcula la probabilidad real de cada resultado en las 5 grandes ligas de Europa, la Liga 1, la Champions femenina y las selecciones, y te avisa cuando la cuota de tu casa paga más de lo que debería.
             </p>
             <div style={{ animationDelay: "0.7s" }} className="enter mt-8 flex flex-col gap-3 min-[420px]:flex-row min-[420px]:flex-wrap">
               <motion.a whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }} href="#partidos"
@@ -191,7 +191,7 @@ export default function Home() {
             <Reveal key={i}><div className="spot lift card h-full p-6"><Icon className="h-5 w-5 text-gold" /><div className="mt-4 font-display text-[38px] font-black leading-none" style={{ fontStretch: "118%" }}>{v}</div><p className="mt-2 text-[14px] text-chalk-2">{l}</p></div></Reveal>
           ))}
         </div>
-        <p className="mt-12 border-t border-white/10 pt-6 text-[13px] text-chalk-3">Pizarra muestra probabilidades, no certezas: una opción del 80% falla 1 de cada 5 veces. Apuesta solo lo que puedas perder. Solo mayores de 18 años.</p>
+        <p className="mt-12 border-t border-white/10 pt-6 text-[13px] text-chalk-3">CuchiFijas muestra probabilidades, no certezas: una opción del 80% falla 1 de cada 5 veces. Apuesta solo lo que puedas perder. Solo mayores de 18 años.</p>
       </section>
     </>
   );

@@ -59,7 +59,7 @@ export default function Resultados() {
             <h3 className="text-[19px] font-extrabold">Precisión 1X2</h3>
             <p className="mt-1 text-[13.5px] text-chalk-3">Brier: 0 es perfecto, más bajo es mejor.</p>
             <div className="mt-4 grid grid-cols-2 gap-4 text-[14px]">
-              <div><div className="num text-[26px] font-semibold">{R.brier?.toFixed(3)}</div>Brier de Pizarra</div>
+              <div><div className="num text-[26px] font-semibold">{R.brier?.toFixed(3)}</div>Brier de CuchiFijas</div>
               <div><div className="num text-[26px] font-semibold text-chalk-2">{R.brier_mercado != null ? R.brier_mercado.toFixed(3) : "–"}</div>Brier de las casas {R.n_con_mercado ? `(${R.n_con_mercado} partidos)` : ""}</div>
               <div><div className="num text-[26px] font-semibold">{pct(R.acierto_favorito)}</div>acierta al favorito</div>
               <div><div className="num text-[26px] font-semibold">{R.logloss?.toFixed(3)}</div>log-loss</div>
