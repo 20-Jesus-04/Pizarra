@@ -38,6 +38,8 @@ PICK_MIN = 0.385         # probabilidad mínima para guardar un pick simulado (c
 
 def kwargs(code):
     nat = code == "INT"
+    if code == "UWCL":   # varias ligas mezcladas: no hay "ascendidos", cada equipo nuevo parte de la media
+        return {"nat": False, "dc": dict(promoted_prior=False), "po": dict(promoted_prior=False), "ba": dict(promoted_prior=False)}
     return {"nat": nat,
             "dc": dict(xi=INT_XI, home_shrink=30.0, promoted_prior=False) if nat else {},
             "po": dict(xi=INT_XI, promoted_prior=False) if nat else {},
@@ -53,7 +55,7 @@ def _labels(df):
 def _test_start(code, df, now):
     if code == "INT":
         return pd.Timestamp(now) - pd.Timedelta(days=int(365 * 2.5))
-    if code == "PER":
+    if code in ("PER", "UWCL"):
         return pd.Timestamp(now.year - 2, 1, 1)
     seasons = sorted(set(df.season))
     s = seasons[-3] if len(seasons) >= 3 else seasons[0]

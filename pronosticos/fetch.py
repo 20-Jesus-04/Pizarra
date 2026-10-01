@@ -15,7 +15,8 @@ from datetime import datetime, timezone
 
 import requests
 
-from .config import LEAGUES, FD_BASE, ESPN_BASE, N_SEASONS_EUROPE, N_YEARS_PERU, INT_COMPETITIONS, INT_RESULTS_URL
+from .config import (LEAGUES, FD_BASE, ESPN_BASE, N_SEASONS_EUROPE, N_YEARS_PERU, INT_COMPETITIONS, INT_RESULTS_URL,
+                     WOMEN_HISTORY, N_YEARS_WOMEN)
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 UA = {
@@ -85,7 +86,7 @@ def _slim_event(e: dict) -> dict:
     c = e["competitions"][0]
     return {
         "id": e["id"], "date": e["date"], "status": e["status"]["type"]["name"],
-        "season": (e.get("season") or {}).get("slug"),
+        "season": (e.get("season") or {}).get("slug"), "neutral": bool(c.get("neutralSite")),
         "t": [{"ha": x["homeAway"], "id": x["team"]["id"], "name": x["team"]["displayName"],
                "score": x.get("score"),
                "st": {s["name"]: s.get("displayValue") for s in (x.get("statistics") or [])}}
@@ -140,6 +141,13 @@ def fetch_all(verbose: bool = True) -> None:
         ev = _espn_year("per.1", y)
         raw["espn"][str(y)] = [_slim_event(e) for e in ev]
         log(f"  ESPN Liga 1 {y}: {len(ev)} partidos")
+
+    # 2b) Champions femenina + ligas domésticas de sus equipos (historia para los ratings)
+    raw["espn_w"] = {}
+    for slug in WOMEN_HISTORY:
+        for y in range(now.year - N_YEARS_WOMEN + 1, now.year + 1):
+            raw["espn_w"].setdefault(slug, {})[str(y)] = [_slim_event(e) for e in _espn_year(slug, y)]
+        log(f"  ESPN {slug}: {sum(len(v) for v in raw['espn_w'][slug].values())} partidos")
 
     # 3) ESPN próximos partidos (todas las ligas) + resultados recientes para mapear nombres
     prox = {"fetched": now.isoformat(), "leagues": {}, "resultados": {}}
@@ -217,6 +225,10 @@ def fetch_all(verbose: bool = True) -> None:
     if not any(raw["espn"].values()):
         print("::warning::ESPN (Liga 1) no respondió: se usan los datos anteriores.")
         raw["espn"] = o_raw.get("espn", {})
+    for slug, years in list(raw["espn_w"].items()):
+        if not any(years.values()) and (o_raw.get("espn_w") or {}).get(slug):
+            print(f"::warning::ESPN {slug} no respondió: se usan los datos anteriores.")
+            raw["espn_w"][slug] = o_raw["espn_w"][slug]
     o_prox = (old("proximos.json") or {}).get("leagues", {})
     o_top5 = old("espn_top5.json") or {}
     for slug in list(prox["leagues"]):
@@ -288,7 +300,7 @@ def _load_old(name):
 # ---------------------------------------------------------------- estadísticas de jugadores (ESPN summary)
 PLAYER_TARGETS = [  # (slug, código, días hacia atrás)
     ("eng.1", "E0", 270), ("esp.1", "SP1", 270), ("ita.1", "I1", 270), ("ger.1", "D1", 270), ("fra.1", "F1", 270),
-    ("per.1", "PER", 450),
+    ("per.1", "PER", 450), ("uefa.wchampions", "UWCL", 450),
 ] + [(s, "INT", 480) for s in INT_COMPETITIONS]
 
 

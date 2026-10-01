@@ -11,7 +11,7 @@ from difflib import SequenceMatcher
 import numpy as np
 import pandas as pd
 
-from .config import LEAGUES, INT_SINCE, FRIENDLY_WEIGHT
+from .config import LEAGUES, INT_SINCE, FRIENDLY_WEIGHT, WOMEN_HISTORY
 from .fetch import DATA_DIR
 
 COLS = {
@@ -67,6 +67,46 @@ def load_europe(raw) -> dict[str, pd.DataFrame]:
         d["away"] = d["away"].str.strip()
         res[div] = d
     return res
+
+
+def load_espn(by_year: dict, div: str, tag: str = "", seen=None) -> list[dict]:
+    """Partidos terminados de un scoreboard de ESPN (por año) en el formato de las demás ligas."""
+    rows, seen = [], seen if seen is not None else set()
+    for year, evs in by_year.items():
+        for e in evs:
+            if e["status"] not in ("STATUS_FULL_TIME", "STATUS_FINAL_PEN", "STATUS_FINAL_AET") or e["id"] in seen:
+                continue
+            seen.add(e["id"])
+            h = next(t for t in e["t"] if t["ha"] == "home")
+            a = next(t for t in e["t"] if t["ha"] == "away")
+            f = lambda t, k: pd.to_numeric(t["st"].get(k), errors="coerce")
+            try:
+                hg, ag = int(h["score"]), int(a["score"])
+            except (TypeError, ValueError):
+                continue
+            rows.append({
+                "date": pd.to_datetime(e["date"]).tz_localize(None).normalize(), "home": h["name"], "away": a["name"],
+                "hg": hg, "ag": ag, "hs": f(h, "totalShots"), "as": f(a, "totalShots"),
+                "hst": f(h, "shotsOnTarget"), "ast": f(a, "shotsOnTarget"), "hc": f(h, "wonCorners"), "ac": f(a, "wonCorners"),
+                "hy": f(h, "yellowCards"), "ay": f(a, "yellowCards"),
+                "hposs": f(h, "possessionPct"), "aposs": f(a, "possessionPct"), "neutral": bool(e.get("neutral")),
+                "season": f"{year}-{e.get('season') or ''}", "div": div, "tournament": tag,
+            })
+    return rows
+
+
+def load_women(raw) -> pd.DataFrame:
+    """Champions femenina + ligas domésticas de sus equipos: un solo grupo de ratings (la Champions las conecta)."""
+    rows, seen = [], set()
+    for slug in WOMEN_HISTORY:
+        rows += load_espn((raw.get("espn_w") or {}).get(slug, {}), "UWCL", slug, seen)
+    if not rows:
+        return pd.DataFrame()
+    d = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
+    d["mw"] = 1.0
+    for c in ["hthg", "htag", "hxg", "axg", "hr", "ar", "hf", "af", "referee"] + list(ODDS):
+        d[c] = np.nan
+    return d
 
 
 def load_peru(raw) -> pd.DataFrame:
@@ -266,6 +306,7 @@ def load_all():
     top5 = _load("espn_top5.json")
     leagues = load_europe(raw)
     leagues["PER"] = load_peru(raw)
+    leagues["UWCL"] = load_women(raw)
     leagues = {k: add_xg_proxy(v) for k, v in leagues.items() if v is not None and not v.empty}
 
     upcoming = []

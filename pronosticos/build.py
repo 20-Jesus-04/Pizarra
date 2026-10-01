@@ -116,7 +116,7 @@ def top_scorers(P, code, now, n=10):
 
 def season_of(df):
     s = str(df.season.iloc[-1])
-    return s[:4] if df["div"].iloc[0] in ("PER", "INT") else s
+    return s[:4] if df["div"].iloc[0] in ("PER", "INT", "UWCL") else s
 
 
 def lima_day(iso: str) -> str:
@@ -173,6 +173,9 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
         if code == "INT":
             recent = df[df.date >= df.date.max() - pd.Timedelta(days=730)]
             cur_teams = set(recent.home) | set(recent.away)
+        elif code == "UWCL":   # solo equipos que jugaron la Champions en el último año (el resto es historia doméstica)
+            ucl = df[(df.tournament == "uefa.wchampions") & (df.date >= df.date.max() - pd.Timedelta(days=400))]
+            cur_teams = set(ucl.home) | set(ucl.away)
         else:
             cur_teams = set(df[df.season.astype(str).str.startswith(cur)].home)
         info = {
@@ -180,7 +183,7 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
             "desde": df.date.min().strftime("%Y-%m-%d"), "hasta": df.date.max().strftime("%Y-%m-%d"),
             "ventaja_local": round(float(np.exp(m.home)), 3), "rho": round(float(m.rho), 3),
             "goles_prom": round(float((df.hg + df.ag)[df.season.astype(str).str.startswith(cur)].mean()), 2),
-            "tabla": [] if code == "INT" else standings(df, cur),
+            "tabla": [] if code in ("INT", "UWCL") else standings(df, cur),
             "ratings": _normalize([r for r in ratings if r["team"] in cur_teams])[:80 if code == "INT" else None],
         }
         if P is not None:

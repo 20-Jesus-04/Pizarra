@@ -8,6 +8,7 @@ LEAGUES = {
     "D1":  {"name": "Bundesliga",     "country": "Alemania",   "fd": "D1",  "espn": "ger.1"},
     "F1":  {"name": "Ligue 1",        "country": "Francia",    "fd": "F1",  "espn": "fra.1"},
     "PER": {"name": "Liga 1",         "country": "Perú",       "fd": None,  "espn": "per.1"},
+    "UWCL": {"name": "Champions Femenina", "country": "Europa", "fd": None, "espn": "uefa.wchampions"},
     "INT": {"name": "Selecciones",    "country": "Internacional", "fd": None, "espn": None},
 }
 
@@ -26,6 +27,11 @@ FRIENDLY_WEIGHT = 0.6         # un amistoso pesa menos que un partido oficial
 # a partir de la fecha actual; aquí solo cuántas hacia atrás.
 N_SEASONS_EUROPE = 4          # temporada actual + 3 anteriores
 N_YEARS_PERU = 3              # año actual + 2 anteriores
+
+# Champions femenina: sus equipos juegan pocos partidos europeos, así que los ratings también aprenden de sus ligas
+# domésticas (solo como historia: en la web se muestran los partidos de la Champions). ESPN no tiene Alemania ni Italia.
+WOMEN_HISTORY = ["uefa.wchampions", "eng.w.1", "esp.w.1", "fra.w.1"]
+N_YEARS_WOMEN = 3
 
 # Modelo
 XI = 0.0019                   # decaimiento temporal por día (vida media ~ 1 año)

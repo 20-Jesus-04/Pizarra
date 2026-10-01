@@ -41,7 +41,7 @@ export default function Home() {
             </h1>
             <p style={{ animationDelay: "0.55s" }}
               className="enter mt-6 max-w-[54ch] text-[clamp(16px,1.7vw,19px)] leading-relaxed text-chalk-2">
-              Pizarra calcula la probabilidad real de cada resultado en las 5 grandes ligas de Europa, la Liga 1 y las selecciones, y te avisa cuando la cuota de tu casa paga más de lo que debería.
+              Pizarra calcula la probabilidad real de cada resultado en las 5 grandes ligas de Europa, la Liga 1, la Champions femenina y las selecciones, y te avisa cuando la cuota de tu casa paga más de lo que debería.
             </p>
             <div style={{ animationDelay: "0.7s" }} className="enter mt-8 flex flex-col gap-3 min-[420px]:flex-row min-[420px]:flex-wrap">
               <motion.a whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }} href="#partidos"
@@ -143,8 +143,8 @@ export default function Home() {
 
       {/* LIGAS */}
       <section className="mx-auto max-w-[1560px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <Reveal><SectionHead eyebrow="7 competiciones" title="Elige tu liga" /></Reveal>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        <Reveal><SectionHead eyebrow={`${Object.keys(LG).length} competiciones`} title="Elige tu liga" /></Reveal>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
           {Object.entries(LG).map(([c, l]: any) => (
             <a key={c} href={`#partidos.${c}`} className="reveal spot lift card group flex flex-col gap-1 p-4 hover:border-gold/40">
               <span className="text-[12px] text-chalk-3">{l.country}</span>

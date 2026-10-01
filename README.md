@@ -1,8 +1,8 @@
 # Pizarra de Pronósticos
 
-Motor de pronósticos de fútbol (Premier, LaLiga, Serie A, Bundesliga, Ligue 1, Liga 1 Perú y selecciones: Nations League, eliminatorias, Copa América, Eurocopa, Mundial, Copa África, amistosos) que corre solo cada día:
+Motor de pronósticos de fútbol (Premier, LaLiga, Serie A, Bundesliga, Ligue 1, Liga 1 Perú, Champions femenina y selecciones: Nations League, eliminatorias, Copa América, Eurocopa, Mundial, Copa África, amistosos) que corre solo cada día:
 
-1. **Datos**: resultados, estadísticas, cuotas y árbitros (football-data.co.uk), selecciones desde 2014 (martj42/international_results), Liga 1, próximos partidos, cuotas actuales, fichas de jugadores y árbitros designados (ESPN).
+1. **Datos**: resultados, estadísticas, cuotas y árbitros (football-data.co.uk), selecciones desde 2014 (martj42/international_results), Liga 1, próximos partidos, cuotas actuales, fichas de jugadores y árbitros designados (ESPN). La Champions femenina usa ESPN y sus ratings también aprenden de la WSL, la Liga F y la Première Ligue (ESPN no tiene Alemania ni Italia).
 2. **Seis modelos independientes**: Poisson, Dixon-Coles, Elo, Bayesiano (Gamma-Poisson), consenso del mercado (cuotas sin margen) y XGBoost (forma, descanso, xG reciente, Elo…).
 3. **Ensamble**: los pesos de cada modelo se recalibran cada semana con un backtest walk-forward (cada semana se reentrena solo con el pasado) y se validan con partidos que no se usaron para elegirlos. Con cuotas, el mercado se lleva casi todo el peso (es muy difícil de superar); sin cuotas (Liga 1, selecciones, partidos lejanos) el ensamble mejora a Dixon-Coles solo.
 4. **Mercados**: el 1X2 y el over 2.5 del ensamble se convierten en una matriz de marcadores → más de 25 mercados + jugadores + estadísticas de equipo.
