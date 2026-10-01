@@ -370,14 +370,18 @@ def write_web(out, out_dir=None):
     # ícono: el SVG va incrustado (sirve también en el artefacto); los PNG se copian junto a la página
     with open(os.path.join(ROOT, "web", "icon.svg"), encoding="utf-8") as f:
         icon = urllib.parse.quote(" ".join(f.read().split()), safe=" /:=.,-")
-    for name in ("favicon-32.png", "apple-touch-icon.png", "icon-512.png"):
+    # + manifest: permite instalar la web como app en el celular ("Agregar a la pantalla de inicio")
+    for name in ("favicon-32.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png",
+                 "manifest.webmanifest"):
         shutil.copyfile(os.path.join(ROOT, "web", name), os.path.join(out_dir, name))
     head = ('<title>CuchiFijas · Pronósticos de fútbol</title>\n'
             '<meta name="description" content="Probabilidades, fijas y oportunidades para el fútbol de hoy, calculadas con seis modelos y un historial público.">\n'
             '<meta property="og:title" content="CuchiFijas">\n<meta name="theme-color" content="#080C18">\n'
             '<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">\n'
             f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{icon}">\n'
-            '<link rel="apple-touch-icon" href="apple-touch-icon.png">\n'
+            '<link rel="apple-touch-icon" href="apple-touch-icon.png">\n<link rel="manifest" href="manifest.webmanifest">\n'
+            '<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="mobile-web-app-capable" content="yes">\n'
+            '<meta name="apple-mobile-web-app-title" content="CuchiFijas">\n<meta name="apple-mobile-web-app-status-bar-style" content="black">\n'
             '<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
             '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..900'
             '&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">\n')
