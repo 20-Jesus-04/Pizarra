@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 
-from .config import LEAGUES, DAYS_AHEAD, MIN_EDGE, MIN_PROB, KELLY_FRACTION
+from .config import ANUALES, LEAGUES, DAYS_AHEAD, MIN_EDGE, MIN_PROB, KELLY_FRACTION
 from .data import load_all, load_results, ES_NAMES
 from .markets import all_markets
 from .stats import team_profile, head_to_head, standings, rate_model
@@ -100,7 +100,7 @@ def _normalize(rows):
 def top_scorers(P, code, now, n=10):
     """Goleadores de la temporada en curso (desde ESPN)."""
     ts = pd.Timestamp(now).tz_localize(None)
-    if code == "PER":
+    if code in ANUALES:
         start = pd.Timestamp(ts.year, 1, 1)
     elif code == "INT":
         start = ts - pd.Timedelta(days=365)
@@ -118,7 +118,7 @@ def top_scorers(P, code, now, n=10):
 
 def season_of(df):
     s = str(df.season.iloc[-1])
-    return s[:4] if df["div"].iloc[0] in ("PER", "INT", "UWCL") else s
+    return s[:4] if df["div"].iloc[0] in (*ANUALES, "INT", "UWCL") else s
 
 
 def lima_day(iso: str) -> str:

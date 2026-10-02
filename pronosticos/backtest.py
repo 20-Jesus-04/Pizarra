@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .config import ANUALES
 from .model import DixonColes, score_matrix
 
 
@@ -14,7 +15,7 @@ def devig(odds: np.ndarray) -> np.ndarray:
 
 
 def walk_forward(df: pd.DataFrame, seasons: list[str], **model_kw) -> pd.DataFrame:
-    test = df[df.season.astype(str).str[:4].isin([s[:4] for s in seasons]) if df["div"].iloc[0] in ("PER", "INT")
+    test = df[df.season.astype(str).str[:4].isin([s[:4] for s in seasons]) if df["div"].iloc[0] in (*ANUALES, "INT")
               else df.season.isin(seasons)].copy()
     test["wk"] = test.date.dt.to_period("W-MON")
     rows = []

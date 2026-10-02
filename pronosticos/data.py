@@ -11,7 +11,7 @@ from difflib import SequenceMatcher
 import numpy as np
 import pandas as pd
 
-from .config import LEAGUES, INT_SINCE, FRIENDLY_WEIGHT, WOMEN_HISTORY
+from .config import LEAGUES, INT_SINCE, FRIENDLY_WEIGHT, WOMEN_HISTORY, ESPN_ANUALES
 from .fetch import DATA_DIR
 
 COLS = {
@@ -100,6 +100,18 @@ def load_women(raw) -> pd.DataFrame:
     rows, seen = [], set()
     for slug in WOMEN_HISTORY:
         rows += load_espn((raw.get("espn_w") or {}).get(slug, {}), "UWCL", slug, seen)
+    if not rows:
+        return pd.DataFrame()
+    d = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
+    d["mw"] = 1.0
+    for c in ["hthg", "htag", "hxg", "axg", "hr", "ar", "hf", "af", "referee"] + list(ODDS):
+        d[c] = np.nan
+    return d
+
+
+def load_espn_anual(raw, code: str) -> pd.DataFrame:
+    """Liga de calendario anual solo de ESPN (Argentina): mismo formato que las demás."""
+    rows = load_espn((raw.get("espn_x") or {}).get(code, {}), code)
     if not rows:
         return pd.DataFrame()
     d = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
@@ -307,6 +319,8 @@ def load_all():
     leagues = load_europe(raw)
     leagues["PER"] = load_peru(raw)
     leagues["UWCL"] = load_women(raw)
+    for code in ESPN_ANUALES:
+        leagues[code] = load_espn_anual(raw, code)
     leagues = {k: add_xg_proxy(v) for k, v in leagues.items() if v is not None and not v.empty}
 
     upcoming = []

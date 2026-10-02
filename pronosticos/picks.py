@@ -141,8 +141,9 @@ def odds_for(o: dict | None) -> dict:
 
 # Grupos de competición: cada uno tiene su propio historial de aciertos (en selecciones hay más goleadas que en
 # las ligas europeas, así que un "Menos de 4.5" no vale lo mismo en ambos).
-GRUPOS = {"INT": "selecciones", "PER": "liga1", "UWCL": "femenino"}
-NOMBRE_GRUPO = {"selecciones": "selecciones", "liga1": "la Liga 1", "femenino": "la Champions femenina", "clubes": "ligas europeas"}
+GRUPOS = {"INT": "selecciones", "PER": "liga1", "ARG": "argentina", "MLS": "mls", "UWCL": "femenino"}
+NOMBRE_GRUPO = {"selecciones": "selecciones", "liga1": "la Liga 1", "argentina": "la Liga Argentina", "mls": "la MLS",
+                "femenino": "la Champions femenina", "clubes": "ligas europeas"}
 
 
 def grupo(liga: str) -> str:

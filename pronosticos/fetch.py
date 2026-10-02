@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 import requests
 
 from .config import (LEAGUES, FD_BASE, ESPN_BASE, N_SEASONS_EUROPE, N_YEARS_PERU, INT_COMPETITIONS, INT_RESULTS_URL,
-                     WOMEN_HISTORY, N_YEARS_WOMEN)
+                     WOMEN_HISTORY, N_YEARS_WOMEN, ESPN_ANUALES)
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 UA = {
@@ -142,6 +142,13 @@ def fetch_all(verbose: bool = True) -> None:
         raw["espn"][str(y)] = [_slim_event(e) for e in ev]
         log(f"  ESPN Liga 1 {y}: {len(ev)} partidos")
 
+    # 2a) otras ligas anuales solo de ESPN (Argentina)
+    raw["espn_x"] = {}
+    for code, (slug, n_years) in ESPN_ANUALES.items():
+        for y in range(now.year - n_years + 1, now.year + 1):
+            raw["espn_x"].setdefault(code, {})[str(y)] = [_slim_event(e) for e in _espn_year(slug, y)]
+        log(f"  ESPN {slug}: {sum(len(v) for v in raw['espn_x'][code].values())} partidos")
+
     # 2b) Champions femenina + ligas domésticas de sus equipos (historia para los ratings)
     raw["espn_w"] = {}
     for slug in WOMEN_HISTORY:
@@ -225,6 +232,10 @@ def fetch_all(verbose: bool = True) -> None:
     if not any(raw["espn"].values()):
         print("::warning::ESPN (Liga 1) no respondió: se usan los datos anteriores.")
         raw["espn"] = o_raw.get("espn", {})
+    for code, years in list(raw["espn_x"].items()):
+        if not any(years.values()) and (o_raw.get("espn_x") or {}).get(code):
+            print(f"::warning::ESPN {code} no respondió: se usan los datos anteriores.")
+            raw["espn_x"][code] = o_raw["espn_x"][code]
     for slug, years in list(raw["espn_w"].items()):
         if not any(years.values()) and (o_raw.get("espn_w") or {}).get(slug):
             print(f"::warning::ESPN {slug} no respondió: se usan los datos anteriores.")
@@ -301,7 +312,7 @@ def _load_old(name):
 PLAYER_TARGETS = [  # (slug, código, días hacia atrás)
     ("eng.1", "E0", 270), ("esp.1", "SP1", 270), ("ita.1", "I1", 270), ("ger.1", "D1", 270), ("fra.1", "F1", 270),
     ("per.1", "PER", 450), ("uefa.wchampions", "UWCL", 450),
-] + [(s, "INT", 480) for s in INT_COMPETITIONS]
+] + [(slug, code, 450) for code, (slug, _) in ESPN_ANUALES.items()] + [(s, "INT", 480) for s in INT_COMPETITIONS]
 
 
 def _clock(v):

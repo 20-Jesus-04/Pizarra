@@ -18,7 +18,7 @@ from scipy.optimize import minimize
 
 from .arbitros import REF_K, factors, fd_rows, validate as validate_refs
 from .backtest import devig, evaluate
-from .config import INT_XI
+from .config import ANUALES, INT_XI
 from .fetch import DATA_DIR
 from .markets import all_markets
 from .model import DixonColes
@@ -55,7 +55,7 @@ def _labels(df):
 def _test_start(code, df, now):
     if code == "INT":
         return pd.Timestamp(now) - pd.Timedelta(days=int(365 * 2.5))
-    if code in ("PER", "UWCL"):
+    if code in (*ANUALES, "UWCL"):
         return pd.Timestamp(now.year - 2, 1, 1)
     seasons = sorted(set(df.season))
     s = seasons[-3] if len(seasons) >= 3 else seasons[0]

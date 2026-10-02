@@ -41,7 +41,7 @@ export default function Home() {
             </h1>
             <p style={{ animationDelay: "0.55s" }}
               className="enter mt-6 max-w-[54ch] text-[clamp(16px,1.7vw,19px)] leading-relaxed text-chalk-2">
-              CuchiFijas calcula la probabilidad real de cada resultado en las 5 grandes ligas de Europa, la Liga 1, la Champions femenina y las selecciones, y te avisa cuando la cuota de tu casa paga más de lo que debería.
+              CuchiFijas calcula la probabilidad real de cada resultado en las 5 grandes ligas de Europa, la Liga 1, la Liga Argentina, la MLS, la Champions femenina y las selecciones, y te avisa cuando la cuota de tu casa paga más de lo que debería.
             </p>
             <div style={{ animationDelay: "0.7s" }} className="enter mt-8 flex flex-col gap-3 min-[420px]:flex-row min-[420px]:flex-wrap">
               <motion.a whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }} href="#partidos"

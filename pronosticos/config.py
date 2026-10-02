@@ -8,6 +8,8 @@ LEAGUES = {
     "D1":  {"name": "Bundesliga",     "country": "Alemania",   "fd": "D1",  "espn": "ger.1"},
     "F1":  {"name": "Ligue 1",        "country": "Francia",    "fd": "F1",  "espn": "fra.1"},
     "PER": {"name": "Liga 1",         "country": "Perú",       "fd": None,  "espn": "per.1"},
+    "ARG": {"name": "Liga Profesional", "country": "Argentina", "fd": None,  "espn": "arg.1"},
+    "MLS": {"name": "MLS",            "country": "Estados Unidos", "fd": None, "espn": "usa.1"},
     "UWCL": {"name": "Champions Femenina", "country": "Europa", "fd": None, "espn": "uefa.wchampions"},
     "INT": {"name": "Selecciones",    "country": "Internacional", "fd": None, "espn": None},
 }
@@ -27,6 +29,10 @@ FRIENDLY_WEIGHT = 0.6         # un amistoso pesa menos que un partido oficial
 # a partir de la fecha actual; aquí solo cuántas hacia atrás.
 N_SEASONS_EUROPE = 4          # temporada actual + 3 anteriores
 N_YEARS_PERU = 3              # año actual + 2 anteriores
+
+# Ligas de calendario anual que salen solo de ESPN (resultados + estadísticas por año): código -> (slug, años)
+ESPN_ANUALES = {"ARG": ("arg.1", 3), "MLS": ("usa.1", 3)}
+ANUALES = ("PER", *ESPN_ANUALES)   # temporada = año calendario
 
 # Champions femenina: sus equipos juegan pocos partidos europeos, así que los ratings también aprenden de sus ligas
 # domésticas (solo como historia: en la web se muestran los partidos de la Champions). ESPN no tiene Alemania ni Italia.
