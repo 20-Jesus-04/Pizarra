@@ -39,7 +39,7 @@ jobs:
             echo "$code  $u"; head -c 150 /tmp/body; echo
           done
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
