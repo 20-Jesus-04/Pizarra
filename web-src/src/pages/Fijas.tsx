@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { FlaskConical, PauseCircle } from "lucide-react";
+import { BellRing, FlaskConical, PauseCircle } from "lucide-react";
 import { BY_ID, DATA, MATCHES, NOW, OPS, dayKey, dayLabel, dayShort, isLive, pct } from "@/lib/data";
 import { Page, PageHeader, Reveal } from "@/components/ui-pz";
 import { JugadorCard, OportunidadCard, SENALES } from "@/components/oport";
@@ -45,6 +45,14 @@ export default function Fijas({ tab: initial = "fijas" }: { tab?: string }) {
         <div className="card mb-6 flex items-start gap-4 p-5">
           <FlaskConical className="h-6 w-6 shrink-0 text-gold" />
           <p className="text-[14.5px] leading-relaxed text-chalk-2"><b className="text-chalk">En calibración.</b> Todavía no hay {c.volumen_30d} picks reales liquidados en 30 días, así que el historial de cada tipo de pick sale del backtest (partidos pasados pronosticados solo con datos anteriores).</p>
+        </div>
+      )}
+
+      {tab === "fijas" && (
+        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-3 sm:px-5">
+          <BellRing className="h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
+          <p className="min-w-[12rem] flex-1 text-[14.5px] text-chalk-2"><b className="text-chalk">Recibe un aviso 30 min antes de cada fija.</b> Gratis, sin registrarte.</p>
+          <a href="#avisos" className="chip !border-gold/40 !text-gold hover:!bg-gold-soft">Activar avisos</a>
         </div>
       )}
 

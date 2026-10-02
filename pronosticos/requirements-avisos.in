@@ -1,0 +1,8 @@
+# Dependencias del workflow "Avisos de fijas" (pronosticos/notificar.py), que corre con secrets.
+# Se compilan con versiones fijas y hashes para el runner (Linux x86_64, Python 3.11):
+#   uv pip compile pronosticos/requirements-avisos.in --python-version 3.11 \
+#     --python-platform x86_64-manylinux_2_28 --generate-hashes -o pronosticos/requirements-avisos.txt
+pywebpush==2.5.0
+cryptography>=50.0.0
+aiohttp>=3.14.3
+urllib3>=2.8.0

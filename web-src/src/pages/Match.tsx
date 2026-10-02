@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from "react";
-import { ArrowLeft, Calculator, Gavel, Info, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowLeft, BellRing, Calculator, Gavel, Info, ShieldCheck, ShieldAlert } from "lucide-react";
 import { BY_ID, DATA, LG, GROUPS, MK_NAMES, allSelections, compName, dayKey, dayLabel, fTime, fair, isLive, isPlayed, keyFacts, marketRows, odd, pct, picksFor, unpack, verdict } from "@/lib/data";
 import { Accordion, Badge, FormDots, HA, Meter, Pitch, Reveal, Ring, SectionHead, Tabs, Ticket } from "@/components/ui-pz";
 import { JugadorCard, OportunidadCard } from "@/components/oport";
@@ -77,6 +77,7 @@ export default function Match({ id, backTo }: { id: string; backTo: string }) {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
             {p.fijas?.length > 0 && <a href="#fijas" className="pop-in tag bg-gold px-2.5 py-1 text-night-900"><ShieldCheck className="h-3.5 w-3.5" />{p.fijas.length === 1 ? "1 fija" : `${p.fijas.length} fijas`}</a>}
+            {p.fijas?.length > 0 && !isLive(p) && <a href="#avisos" className="pop-in tag bg-white/[0.06] px-2.5 py-1 text-gold ring-1 ring-gold/40 transition-colors hover:bg-gold-soft"><BellRing className="h-3.5 w-3.5" />Avísame</a>}
             {p.auditoria && <span className={`tag px-2.5 py-1 ${p.auditoria.estado === "ok" ? "bg-turf-soft text-turf" : p.auditoria.estado === "revisar" ? "bg-gold-soft text-gold" : "bg-flare/15 text-flare"}`}>{p.auditoria.estado === "ok" ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}{p.auditoria.estado === "ok" ? "Auditoría ok" : p.auditoria.estado === "revisar" ? "Con avisos" : "Bloqueado"}</span>}
             <span className="tag bg-white/[0.06] px-2.5 py-1 text-chalk-2"><Gavel className="h-3.5 w-3.5" />{p.arbitro?.nombre || "Árbitro por confirmar"}</span>
             {p.mercado && <span className="tag bg-cobalt-soft px-2.5 py-1 text-cobalt">Con cuotas</span>}

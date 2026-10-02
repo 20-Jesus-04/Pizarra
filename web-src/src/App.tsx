@@ -10,6 +10,7 @@ import Guide from "@/pages/Guide";
 import Fijas from "@/pages/Fijas";
 import Resultados from "@/pages/Resultados";
 import Metodo from "@/pages/Metodo";
+import Avisos from "@/pages/Avisos";
 import { BY_ID, DATA, LG, MATCHES, NOW } from "@/lib/data";
 
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -99,7 +100,7 @@ export default function App() {
   const arg = rest.join(".") || null;
   const [lastLg, setLastLg] = useState<string | null>(null);
   useEffect(() => { if (view === "partidos") setLastLg(arg); }, [view, arg]);
-  const section = view === "p" ? "partidos" : view === "liga" ? "ligas" : ["partidos", "ligas", "fijas", "resultados", "metodo"].includes(view) ? view : view === "oportunidades" ? "fijas" : view === "guia" ? "metodo" : "inicio";
+  const section = view === "avisos" ? "" : view === "p" ? "partidos" : view === "liga" ? "ligas" : ["partidos", "ligas", "fijas", "resultados", "metodo"].includes(view) ? view : view === "oportunidades" ? "fijas" : view === "guia" ? "metodo" : "inicio";
 
   let page, title;
   if (view === "partidos") { page = <Matches lg={arg && LG[arg] ? arg : null} />; title = "Partidos"; }
@@ -110,6 +111,7 @@ export default function App() {
   else if (view === "oportunidades") { page = <Fijas key="o" tab="oportunidades" />; title = "Oportunidades"; }
   else if (view === "resultados") { page = <Resultados />; title = "Resultados"; }
   else if (view === "metodo") { page = <Metodo />; title = "Metodología"; }
+  else if (view === "avisos") { page = <Avisos />; title = "Avisos"; }
   else { page = <Home />; title = "Pronósticos con datos"; }
 
   useEffect(() => {
@@ -160,7 +162,7 @@ export default function App() {
               <p className="mt-3 max-w-[42ch] text-[14px] leading-relaxed text-chalk-3">Seis modelos estadísticos, un auditor automático y un historial que no se borra. Probabilidades, no certezas.</p>
               <p className="mt-3 text-[12.5px] text-chalk-3">Datos del {new Date(DATA.generado).toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "long", timeStyle: "short" })}</p>
             </div>
-            {[["Pronósticos", [["Partidos", "#partidos"], ["Fijas", "#fijas"], ["Ligas", "#ligas"]]], ["Transparencia", [["Resultados", "#resultados"], ["Metodología", "#metodo"], ["Guía rápida", "#guia"]]]].map(([h, links]) => (
+            {[["Pronósticos", [["Partidos", "#partidos"], ["Fijas", "#fijas"], ["Ligas", "#ligas"], ["Avisos", "#avisos"]]], ["Transparencia", [["Resultados", "#resultados"], ["Metodología", "#metodo"], ["Guía rápida", "#guia"]]]].map(([h, links]) => (
               <div key={h as string}>
                 <div className="eyebrow">{h as string}</div>
                 <ul className="mt-3 grid gap-2 text-[14.5px]">

@@ -1,0 +1,6 @@
+# Backend de construcción para http-ece (solo publica sdist, sin pyproject.toml). Se instala antes,
+# con hash, y luego requirements-avisos.txt va con --no-build-isolation: así pip no baja un
+# setuptools sin verificar para construirlo.
+#   uv pip compile pronosticos/requirements-avisos-build.in --python-version 3.11 \
+#     --python-platform x86_64-manylinux_2_28 --generate-hashes -o pronosticos/requirements-avisos-build.txt
+setuptools>=70.1

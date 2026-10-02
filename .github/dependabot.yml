@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Dependencias con hashes del workflow "Avisos de fijas" (pronosticos/requirements-avisos*.txt)
+  - package-ecosystem: "pip"
+    directory: "/pronosticos"
+    schedule:
+      interval: "weekly"
+
+  # Actions fijadas por SHA en .github/workflows/
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

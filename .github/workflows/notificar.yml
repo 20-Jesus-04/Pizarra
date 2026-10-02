@@ -1,0 +1,53 @@
+name: Avisos de fijas
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # cada 10 min; avisa ~30 min antes de cada partido con fija
+  workflow_dispatch:          # botón "Run workflow"
+    inputs:
+      prueba:
+        description: "Mandar ya un aviso de prueba a los celulares de PUSH_SUBSCRIPTIONS (no a los suscriptores públicos)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avisos
+  cancel-in-progress: false
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /pronosticos/
+            /docs/data.json
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+
+      # Versiones fijas y hashes (Linux, Python 3.11). http-ece solo publica sdist: se construye con el
+      # setuptools fijado del primer archivo y sin aislamiento, para que pip no baje uno sin verificar.
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --require-hashes --no-deps -r pronosticos/requirements-avisos-build.txt
+          python -m pip install --require-hashes --no-deps --no-build-isolation -r pronosticos/requirements-avisos.txt
+
+      # Lo ya avisado vive en D1 (/v1/marcar del Worker): no hay caché de Actions que se pueda envenenar.
+      - name: Enviar avisos
+        id: avisos
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_SUBSCRIPTIONS: ${{ secrets.PUSH_SUBSCRIPTIONS }}
+          AVISOS_URL: ${{ vars.AVISOS_URL }}
+          AVISOS_TOKEN: ${{ secrets.AVISOS_TOKEN }}
+          PRUEBA: ${{ inputs.prueba }}
+        run: python -m pronosticos.notificar

@@ -372,7 +372,7 @@ def write_web(out, out_dir=None):
         icon = urllib.parse.quote(" ".join(f.read().split()), safe=" /:=.,-")
     # + manifest: permite instalar la web como app en el celular ("Agregar a la pantalla de inicio")
     for name in ("favicon-32.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png",
-                 "manifest.webmanifest"):
+                 "manifest.webmanifest", "sw.js", "badge-96.png"):
         shutil.copyfile(os.path.join(ROOT, "web", name), os.path.join(out_dir, name))
     head = ('<title>CuchiFijas · Pronósticos de fútbol</title>\n'
             '<meta name="description" content="Probabilidades, fijas y oportunidades para el fútbol de hoy, calculadas con seis modelos y un historial público.">\n'

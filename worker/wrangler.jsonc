@@ -1,0 +1,41 @@
+// CuchiFijas · avisos públicos. Guarda en D1 las suscripciones Web Push de los visitantes;
+// el workflow "Avisos de fijas" (pronosticos/notificar.py) las baja con AVISOS_TOKEN y envía los avisos.
+// Secret: AVISOS_TOKEN (wrangler secret put AVISOS_TOKEN).
+//
+// Desarrollo local: crea worker/.dev.vars (ignorado por git) con
+//   AVISOS_TOKEN=<token de prueba de 32+ caracteres>
+//   ALLOWED_ORIGINS=https://20-jesus-04.github.io,http://localhost:8765
+// .dev.vars pisa a "vars", así que localhost solo se permite en tu máquina, nunca en producción.
+{
+  "name": "cuchifijas-avisos",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-30",
+  "workers_dev": true,
+  "preview_urls": false,
+
+  // Sin Workers Logs: guardarían metadatos de cada petición (IP incluida). El Worker no registra nada personal.
+  "observability": { "enabled": false },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cuchifijas-avisos",
+      "database_id": "1c963298-8cc0-45ee-8896-9fd4aa8417f0"
+    }
+  ],
+
+  "vars": {
+    "ALLOWED_ORIGINS": "https://20-jesus-04.github.io",
+    "MAX_SUSCRIPCIONES": "20000"
+  },
+
+  // Rate limiting de las rutas públicas: 20 peticiones por minuto por IP (/64 en IPv6) y ubicación de Cloudflare.
+  // Es obligatorio: si falta o falla, /v1/suscribir responde 503 (falla cerrado).
+  "ratelimits": [
+    {
+      "name": "LIMITE",
+      "namespace_id": "4207",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ]
+}
