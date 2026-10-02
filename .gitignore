@@ -2,3 +2,4 @@ __pycache__/
 data/bt.pkl
 .avisos/
 web-src/.parcel-cache/
+.wrangler/

@@ -22,7 +22,7 @@ from .data import load_all, load_results, ES_NAMES
 from .markets import all_markets
 from .stats import team_profile, head_to_head, standings, rate_model
 from .players import load_player_data, squad_projection, compact, PKEYS, team_stat_markets, team_rate_predictor
-from .picks import PICK_LABELS, get as _get
+from .picks import PICK_LABELS, get as _get, grupo as grupo_de
 from . import arbitros, auditor, ensamble, historial, oportunidades
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -205,6 +205,7 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
     estado = {"liquidados_30d": res.get("liquidados_30d", 0), "fijas_30d": res.get("fijas_30d") or {}}
     estado["modo"] = "real" if estado["liquidados_30d"] >= oportunidades.VOLUMEN_30D else "calibracion"
     reales = historial.subtipos_reales(hist)
+    reales_g = {g: historial.subtipos_reales(hist, g) for g in {grupo_de(c) for c in leagues}}
 
     # 3) cada próximo partido
     for u in upcoming:
@@ -309,7 +310,8 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
         })
         # oportunidades: modelo + historial del pick + partidos recientes + jugadores + cuota
         pj = out["partidos"][-1]
-        ctx = oportunidades.contexto(df, u["home"], u["away"], sq_h, sq_a, cache, reales, estado["modo"])
+        g = grupo_de(code)
+        ctx = oportunidades.contexto(df, u["home"], u["away"], sq_h, sq_a, cache, reales, estado["modo"], g, reales_g.get(g))
         pj["oportunidades"] = oportunidades.analizar(pj, ctx)
         pj["destacada"] = pj["oportunidades"][0] if pj["oportunidades"] else None
         pj["oportunidades_jugador"] = oportunidades.oportunidades_jugador(

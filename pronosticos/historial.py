@@ -15,7 +15,8 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 
 from .fetch import DATA_DIR
-from .picks import BANDS, LABEL, PICK_LABELS, band_of, get, levels, settle
+from .picks import BANDS, LABEL, PICK_LABELS, band_of, get, grupo, levels, settle
+
 
 PATH = os.path.join(DATA_DIR, "historial.json")
 GUARDAR_DESDE = 0.385       # se guardan todos los picks candidatos con prob >= 38.5% (para calibración real)
@@ -116,10 +117,12 @@ def _outcomes(rec):
     return out
 
 
-def subtipos_reales(h: dict) -> dict:
-    """Mismas estadísticas por nivel y subtipo que el backtest, pero con resultados reales."""
+def subtipos_reales(h: dict, solo_grupo: str | None = None) -> dict:
+    """Mismas estadísticas por nivel y subtipo que el backtest, pero con resultados reales (opcional: de un solo grupo)."""
     rows = []
     for rec in h["partidos"].values():
+        if solo_grupo and grupo(rec["liga"]) != solo_grupo:
+            continue
         for k, pr, ok in _outcomes(rec):
             b = band_of(pr)
             if b:
@@ -200,7 +203,8 @@ def metricas(h: dict, now: datetime, lima_day) -> dict:
     out["fijas_30d"]["esperado"] = esperado([x for x in fij if _t(x["fecha"]) >= cut30])
     out["oportunidades"] = {**stat(dest), "esperado": esperado(dest)}
     out["liquidados_30d"] = sum(1 for r in recs if _t(r["fecha"]) >= cut30 for _ in _outcomes(r))
-    out["ultimos"] = sorted(pub + fij + dest, key=lambda x: x["fecha"], reverse=True)[:100]
+    out["ultimos"] = sorted(pub + fij + dest, key=lambda x: x["fecha"], reverse=True)[:300]
+
     # evolución diaria del acierto del pick principal
     by_day = defaultdict(lambda: [0, 0])
     for x in pub:

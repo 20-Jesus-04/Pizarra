@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Check, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { DATA, longDate, pct } from "@/lib/data";
 import { Meter, Page, PageHeader, Reveal } from "@/components/ui-pz";
 
@@ -71,38 +72,7 @@ export default function Resultados() {
         <div className="card mt-5 p-6 text-[14.5px] text-chalk-2">El registro empezó hace poco: las métricas reales aparecen cuando se liquiden los primeros partidos. Mientras tanto, abajo está el backtest.</div>
       )}
 
-      {R.ultimos?.length > 0 && (
-        <Reveal><div className="card mt-5 p-5 sm:p-6">
-          <h3 className="text-[19px] font-extrabold">Últimos picks liquidados</h3>
-          <ul className="mt-4 grid grid-cols-1 gap-2 md:hidden">
-            {R.ultimos.map((x: any, i: number) => (
-              <li key={i} className={`flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 ring-1 ${x.acierto ? "bg-turf-soft/40 ring-turf/20" : "bg-flare/5 ring-flare/20"}`}>
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${x.acierto ? "bg-turf text-night-900" : "bg-flare text-white"}`}>{x.acierto ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-semibold">{x.tipo === "fija" && <span className="tag mr-1.5 bg-gold-soft text-gold">Fija</span>}{x.seleccion}</div>
-                  <div className="truncate text-[12.5px] text-chalk-3">{x.local} {x.marcador} {x.visita}</div>
-                </div>
-                <span className="num text-[13px] text-chalk-2">{pct(x.prob)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="-mx-2 mt-4 hidden overflow-x-auto md:block">
-            <table className="pz">
-              <thead><tr><th>Partido</th><th>Pick</th><th className="n">Prob.</th><th className="n">Marcador</th><th className="n">Resultado</th></tr></thead>
-              <tbody>
-                {R.ultimos.map((x: any, i: number) => (
-                  <tr key={i}>
-                    <td><span className="text-[12px] text-chalk-3">{new Date(x.fecha).toLocaleDateString("es-PE", { day: "numeric", month: "short" })}</span> {x.local} – {x.visita}</td>
-                    <td>{x.tipo === "fija" && <span className="tag mr-1.5 bg-gold-soft text-gold">Fija</span>}{x.seleccion}</td>
-                    <td className="n">{pct(x.prob)}</td><td className="n">{x.marcador}</td>
-                    <td className="n">{x.acierto ? <Check className="ml-auto h-4 w-4 text-turf" aria-label="acierto" /> : <X className="ml-auto h-4 w-4 text-flare" aria-label="fallo" />}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div></Reveal>
-      )}
+      {R.ultimos?.length > 0 && <Reveal><Liquidados items={R.ultimos} /></Reveal>}
 
       <div className="mt-14 flex items-center gap-3"><h2 className="text-[clamp(20px,3vw,26px)] font-black">Backtest: {ev?.periodo ? `${longDate(ev.periodo[0])} a ${longDate(ev.periodo[1])}` : "partidos pasados"}</h2><span className="hidden h-px flex-1 bg-white/[0.08] sm:block" /></div>
       <p className="mt-2 max-w-[72ch] text-[14.5px] text-chalk-3">Cada semana se reentrenan los modelos solo con partidos anteriores y se pronostica la siguiente. Los pesos del ensamble se evalúan con partidos que no vieron (validación cruzada temporal).</p>
@@ -159,6 +129,109 @@ function ModelRows({ ev }: { ev: any }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+const POR_PAGINA = 10;
+const chip = (on: boolean) => `chip ${on ? "!border-transparent !bg-chalk !text-night-900" : ""}`;
+
+/** Paginador compacto: "11–20 de 99" y flechas. */
+function Pager({ page, pages, total, porPagina = POR_PAGINA, onPage }: { page: number; pages: number; total: number; porPagina?: number; onPage: (p: number) => void }) {
+  const from = total ? page * porPagina + 1 : 0, to = Math.min(total, (page + 1) * porPagina);
+  const btn = "grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.03] text-chalk-2 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35";
+  return (
+    <nav className="mt-4 flex items-center justify-between gap-3" aria-label="Páginas">
+      <span className="num text-[12.5px] text-chalk-3">{from}–{to} de {total}</span>
+      {pages > 1 && (
+        <div className="flex items-center gap-1.5">
+          <button type="button" className={btn} disabled={page === 0} onClick={() => onPage(page - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></button>
+          <span className="num min-w-[4.5rem] text-center text-[13px] text-chalk-2">{page + 1} / {pages}</span>
+          <button type="button" className={btn} disabled={page >= pages - 1} onClick={() => onPage(page + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></button>
+        </div>
+      )}
+    </nav>
+  );
+}
+
+function usePaged<T>(list: T[], porPagina = POR_PAGINA) {
+  const [page, setPage] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const pages = Math.max(1, Math.ceil(list.length / porPagina));
+  const pg = Math.min(page, pages - 1);
+  const go = (p: number) => {
+    setPage(p);
+    const el = ref.current;
+    if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: "start" });
+  };
+  return { ref, pg, pages, go, reset: () => setPage(0), view: list.slice(pg * porPagina, (pg + 1) * porPagina) };
+}
+
+function TipoTag({ t }: { t: string }) {
+  if (t === "fija") return <span className="tag mr-1.5 bg-gold-soft text-gold">Fija</span>;
+  if (t === "destacada" || t === "oportunidad") return <span className="tag mr-1.5 bg-cobalt-soft text-cobalt">Oport.</span>;
+  return null;
+}
+
+const fechaCorta = (f: string) => new Date(f).toLocaleDateString("es-PE", { day: "numeric", month: "short" });
+
+function Liquidados({ items }: { items: any[] }) {
+  const [res, setRes] = useState<"todos" | "ok" | "fallo">("todos");
+  const [tipo, setTipo] = useState<"todos" | "fija" | "oport" | "principal">("todos");
+  const porTipo = items.filter((x) => tipo === "todos" || (tipo === "fija" ? x.tipo === "fija" : tipo === "principal" ? x.tipo === "principal" : x.tipo === "destacada" || x.tipo === "oportunidad"));
+  const list = porTipo.filter((x) => res === "todos" || (res === "ok") === !!x.acierto);
+  const P = usePaged(list);
+  const ok = porTipo.filter((x) => x.acierto).length;
+  return (
+    <div ref={P.ref} className="card mt-5 scroll-mt-24 p-5 sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 className="text-[19px] font-extrabold">Picks liquidados</h3>
+        <span className="text-[13px] text-chalk-3">{porTipo.length ? `${ok} de ${porTipo.length} acertados (${pct(ok / porTipo.length)})` : ""}</span>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tipo de pick">
+          {([["todos", "Todos"], ["fija", "Fijas"], ["oport", "Oportunidades"], ["principal", "Principal"]] as const).map(([k, l]) => (
+            <button key={k} type="button" className={chip(tipo === k)} aria-pressed={tipo === k} onClick={() => { setTipo(k); P.reset(); }}>{l}</button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Resultado">
+          {([["todos", "Todos"], ["ok", `Aciertos (${ok})`], ["fallo", `Fallos (${porTipo.length - ok})`]] as const).map(([k, l]) => (
+            <button key={k} type="button" className={chip(res === k)} aria-pressed={res === k} onClick={() => { setRes(k); P.reset(); }}>{l}</button>
+          ))}
+        </div>
+      </div>
+      {list.length === 0 ? <p className="mt-6 text-center text-[14px] text-chalk-3">No hay picks con estos filtros.</p> : (
+        <>
+          <ul className="mt-4 grid grid-cols-1 gap-2 md:hidden">
+            {P.view.map((x: any, i: number) => (
+              <li key={`${x.id}-${x.seleccion}-${i}`} className={`flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 ring-1 ${x.acierto ? "bg-turf-soft/40 ring-turf/20" : "bg-flare/5 ring-flare/20"}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${x.acierto ? "bg-turf text-night-900" : "bg-flare text-white"}`}>{x.acierto ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[14px] font-semibold"><TipoTag t={x.tipo} />{x.seleccion}</div>
+                  <div className="truncate text-[12.5px] text-chalk-3">{fechaCorta(x.fecha)} · {x.local} {x.marcador} {x.visita}</div>
+                </div>
+                <span className="num text-[13px] text-chalk-2">{pct(x.prob)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="-mx-2 mt-4 hidden overflow-x-auto md:block">
+            <table className="pz">
+              <thead><tr><th>Partido</th><th>Pick</th><th className="n">Prob.</th><th className="n">Marcador</th><th className="n">Resultado</th></tr></thead>
+              <tbody>
+                {P.view.map((x: any, i: number) => (
+                  <tr key={`${x.id}-${x.seleccion}-${i}`}>
+                    <td><span className="text-[12px] text-chalk-3">{fechaCorta(x.fecha)}</span> {x.local} – {x.visita}</td>
+                    <td><TipoTag t={x.tipo} />{x.seleccion}</td>
+                    <td className="n">{pct(x.prob)}</td><td className="n">{x.marcador}</td>
+                    <td className="n">{x.acierto ? <Check className="ml-auto h-4 w-4 text-turf" aria-label="acierto" /> : <X className="ml-auto h-4 w-4 text-flare" aria-label="fallo" />}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <Pager page={P.pg} pages={P.pages} total={list.length} onPage={P.go} />
     </div>
   );
 }

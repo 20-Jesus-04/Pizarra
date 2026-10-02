@@ -286,6 +286,23 @@ def subtype_stats(picks: pd.DataFrame) -> dict:
     return out
 
 
+def subtype_stats_grupo(picks: pd.DataFrame) -> dict:
+    """Lo mismo que subtype_stats, separado por grupo de competición (selecciones, Liga 1, femenino, clubes)."""
+    from .picks import grupo
+    g = picks.lg.map(grupo)
+    return {k: subtype_stats(picks[g == k]) for k in sorted(set(g))}
+
+
+def goles_backtest(bt: pd.DataFrame) -> dict:
+    """Goles esperados (ensamble) vs reales por liga y por lado, fuera de muestra."""
+    out = {}
+    for code, g in bt.dropna(subset=["ens_H", "ens_O"]).groupby("lg"):
+        lm = np.array([implied_rates_fast(r.ens_H, r.ens_A, r.ens_O, r.rho, r.dc_lam, r.dc_mu) for r in g.itertuples()])
+        out[code] = {"n": int(len(g)), "local_esp": round(float(lm[:, 0].mean()), 3), "local_real": round(float(g.hg.mean()), 3),
+                     "visita_esp": round(float(lm[:, 1].mean()), 3), "visita_real": round(float(g.ag.mean()), 3)}
+    return out
+
+
 def band_summary(picks: pd.DataFrame) -> dict:
     """Acierto real vs declarado de cada nivel en el backtest (lo que el usuario puede esperar)."""
     out = {}
@@ -332,7 +349,8 @@ def calibrar(leagues: dict, now=None, verbose=True, P=None) -> dict:
     arb["k"] = REF_K
     out = {"version": 3, "fecha": now.isoformat(), "segundos": round(time.time() - t0),
            "pesos": pesos, "evaluacion": ev, "calibracion": tabla_cal, "curva": curva,
-           "subtipos": subtype_stats(picks), "niveles": band_summary(picks), "picks_simulados": int(len(picks)),
+           "subtipos": subtype_stats(picks), "subtipos_grupo": subtype_stats_grupo(picks), "goles_backtest": goles_backtest(bt),
+           "niveles": band_summary(picks), "picks_simulados": int(len(picks)),
            "acierto_simulado_70": round(float(picks.ok[picks.p >= 0.7].mean()), 4) if len(picks) else None,
            "ligas": ligas, "arbitros": arb, "nombres": NOMBRES}
     if P is not None:

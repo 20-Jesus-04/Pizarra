@@ -137,3 +137,13 @@ def odds_for(o: dict | None) -> dict:
         out[f"handicap_asiatico_local|{float(ah):+g}|gana"] = o.get("ah_home")
         out[f"handicap_asiatico_local|{float(ah):+g}|pierde"] = o.get("ah_away")
     return {k: v for k, v in out.items() if v}
+
+
+# Grupos de competición: cada uno tiene su propio historial de aciertos (en selecciones hay más goleadas que en
+# las ligas europeas, así que un "Menos de 4.5" no vale lo mismo en ambos).
+GRUPOS = {"INT": "selecciones", "PER": "liga1", "UWCL": "femenino"}
+NOMBRE_GRUPO = {"selecciones": "selecciones", "liga1": "la Liga 1", "femenino": "la Champions femenina", "clubes": "ligas europeas"}
+
+
+def grupo(liga: str) -> str:
+    return GRUPOS.get(liga, "clubes")

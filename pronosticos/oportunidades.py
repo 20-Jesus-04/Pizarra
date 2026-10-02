@@ -27,7 +27,7 @@ import pandas as pd
 from scipy.stats import beta
 
 from .ensamble import calibrate_prob
-from .picks import LABEL, PICK_LABELS, band_of, get, levels, odds_for, settle
+from .picks import LABEL, NOMBRE_GRUPO, PICK_LABELS, band_of, get, levels, odds_for, settle
 
 GRUPO = {"res": "resultado", "dc": "resultado", "dnb": "resultado", "ah": "resultado",
          "ou": "goles", "tl": "goles", "tv": "goles", "tl2": "goles", "ht": "goles", "btts": "goles",
@@ -52,21 +52,28 @@ def lcb(hits: int, n: int, q: float = 0.10) -> float:
 
 
 # ------------------------------------------------------------------ señal 2: historial del tipo de pick
-def historial(path, pr: float, real: dict, sim: dict, modo: str):
+def historial(path, pr: float, real: dict, sim: dict, modo: str, real_g: dict | None = None, sim_g: dict | None = None,
+              grupo: str | None = None):
+    """Primero el historial del mismo grupo de competición (selecciones, Liga 1, femenino, clubes); si no alcanza,
+    el de todas las competiciones juntas. Dentro de cada uno, del subtipo más específico al más general."""
     band = band_of(pr)
     if not band:
         return None
-    for i, k in enumerate(levels(path)):
-        lvl = f"l{i + 1}"
-        fuentes = (("real", real), ("backtest", sim)) if modo == "real" else (("backtest", sim),)
-        for fuente, stats in fuentes:
-            s = ((stats.get(band) or {}).get(lvl) or {}).get(k)
-            if s and s["n"] >= MIN_N:
-                pm, h, n = s["prob_media"], s["aciertos"], s["n"]
-                return {"n": n, "aciertos": h, "prob_media": pm, "real": round(h / n, 4),
-                        "ratio_lcb": round(lcb(h, n) / pm, 4),                       # real creíble / declarado
-                        "ratio": round((h + 30 * pm) / (n * pm + 30 * pm), 4),        # encogido hacia 1
-                        "ultimos10": s.get("ultimos10") or [], "nivel": lvl, "fuente": fuente}
+    conjuntos = []
+    if grupo and (real_g or sim_g):
+        conjuntos.append((grupo, (("real", real_g or {}), ("backtest", sim_g or {})) if modo == "real" else (("backtest", sim_g or {}),)))
+    conjuntos.append((None, (("real", real), ("backtest", sim)) if modo == "real" else (("backtest", sim),)))
+    for g, fuentes in conjuntos:
+        for i, k in enumerate(levels(path)):
+            lvl = f"l{i + 1}"
+            for fuente, stats in fuentes:
+                s = ((stats.get(band) or {}).get(lvl) or {}).get(k)
+                if s and s["n"] >= MIN_N:
+                    pm, h, n = s["prob_media"], s["aciertos"], s["n"]
+                    return {"n": n, "aciertos": h, "prob_media": pm, "real": round(h / n, 4),
+                            "ratio_lcb": round(lcb(h, n) / pm, 4),                       # real creíble / declarado
+                            "ratio": round((h + 30 * pm) / (n * pm + 30 * pm), 4),        # encogido hacia 1
+                            "ultimos10": s.get("ultimos10") or [], "nivel": lvl, "fuente": fuente, "grupo": g}
     return None
 
 
@@ -153,11 +160,11 @@ def _clip(x, lo=0.0, hi=1.0):
     return max(lo, min(hi, x))
 
 
-def evaluar(path, pr, curva, real, sim, modo, rows_h, rows_a, pl_h, pl_a, odds=None) -> dict | None:
+def evaluar(path, pr, curva, real, sim, modo, rows_h, rows_a, pl_h, pl_a, odds=None, real_g=None, sim_g=None, grupo=None) -> dict | None:
     pc = calibrate_prob(pr, curva)
     if not (1 / MAX_CUOTA <= pc <= 1 / MIN_CUOTA):
         return None
-    hist = historial(path, pr, real, sim, modo)
+    hist = historial(path, pr, real, sim, modo, real_g, sim_g, grupo)
     if not hist or hist["ratio_lcb"] < 0.92 or hist["real"] < hist["prob_media"]:
         return None                                   # el historial muestra que en este pick el modelo exagera
     rec = reciente(path, rows_h, rows_a)
@@ -177,7 +184,8 @@ def evaluar(path, pr, curva, real, sim, modo, rows_h, rows_a, pl_h, pl_a, odds=N
          "cuota": (0.3 if sospechoso else _clip(ev / 0.10)) if ev is not None else 0.5,
          "probabilidad": _clip((pc - 1 / MAX_CUOTA) / (0.77 - 1 / MAX_CUOTA))}
     puntaje = round(100 * sum(PESOS[k] * v for k, v in s.items()))
-    razones = [f"Historial: {hist['aciertos']} de {hist['n']} acertados ({hist['real'] * 100:.0f}%) cuando se declaraba {hist['prob_media'] * 100:.0f}%"]
+    ambito = f" en {NOMBRE_GRUPO.get(hist['grupo'], hist['grupo'])}" if hist.get("grupo") else ""
+    razones = [f"Historial{ambito}: {hist['aciertos']} de {hist['n']} acertados ({hist['real'] * 100:.0f}%) cuando se declaraba {hist['prob_media'] * 100:.0f}%"]
     if rec:
         razones.append(f"Últimos partidos: se cumplió {rec['frecuencia'] * 100:.0f}% de las veces (local {rec['local']}, visita {rec['visita']})")
     if jug_txt:
@@ -192,7 +200,7 @@ def evaluar(path, pr, curva, real, sim, modo, rows_h, rows_a, pl_h, pl_a, odds=N
             "cuota_justa": round(1 / p_real, 2), "cuota_minima": round(MARGEN / p_real, 2), "cuota_casa": odds,
             "ev": round(ev, 4) if ev is not None else None, "valor_sospechoso": sospechoso, "puntaje": puntaje,
             "senales": {k: round(v, 2) for k, v in s.items()}, "razones": razones, "fija": fija,
-            "historial": {k: hist[k] for k in ("n", "aciertos", "real", "prob_media", "fuente")},
+            "historial": {k: hist[k] for k in ("n", "aciertos", "real", "prob_media", "fuente", "grupo")},
             "reciente": rec, "grupo": GRUPO.get(levels(path)[2].split("|")[0], path[0])}
 
 
@@ -207,7 +215,7 @@ def analizar(p: dict, ctx: dict) -> list:
         if pr is None:
             continue
         o = evaluar(path, pr, ctx["curva"], ctx["real"], ctx["sim"], ctx["modo"], ctx["rows_h"], ctx["rows_a"],
-                    ctx["pl_h"], ctx["pl_a"], om.get("|".join(path)))
+                    ctx["pl_h"], ctx["pl_a"], om.get("|".join(path)), ctx.get("real_g"), ctx.get("sim_g"), ctx.get("grupo"))
         if o and o["puntaje"] >= MIN_PUNTAJE:
             cands.append(o)
     cands.sort(key=lambda o: -o["puntaje"])
@@ -300,7 +308,9 @@ def fijas(partidos: list, estado: dict, now: datetime, lima_day) -> dict:
     return info
 
 
-def contexto(df: pd.DataFrame, home: str, away: str, pl_h, pl_a, cache: dict, real: dict, modo: str) -> dict:
+def contexto(df: pd.DataFrame, home: str, away: str, pl_h, pl_a, cache: dict, real: dict, modo: str,
+             grupo: str | None = None, real_g: dict | None = None) -> dict:
     return {"curva": cache.get("curva"), "sim": cache.get("subtipos") or {}, "real": real, "modo": modo,
+            "grupo": grupo, "real_g": real_g, "sim_g": (cache.get("subtipos_grupo") or {}).get(grupo) if grupo else None,
             "rows_h": _persp(df, home, True, RECIENTES), "rows_a": _persp(df, away, False, RECIENTES),
             "pl_h": pl_h, "pl_a": pl_a}
