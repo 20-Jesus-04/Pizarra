@@ -202,7 +202,7 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
     hist = historial.load()
     n_liq = historial.liquidar(hist, load_results(), now)
     res = historial.metricas(hist, now, lima_day)
-    estado = {"liquidados_30d": res.get("liquidados_30d", 0), "fijas_30d": res.get("fijas_30d") or {}}
+    estado = {"liquidados_30d": res.get("liquidados_30d", 0)}
     estado["modo"] = "real" if estado["liquidados_30d"] >= oportunidades.VOLUMEN_30D else "calibracion"
     reales = historial.subtipos_reales(hist)
     reales_g = {g: historial.subtipos_reales(hist, g) for g in {grupo_de(c) for c in leagues}}

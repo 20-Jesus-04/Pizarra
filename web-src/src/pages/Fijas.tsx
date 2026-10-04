@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { BellRing, FlaskConical, PauseCircle } from "lucide-react";
+import { BellRing, FlaskConical } from "lucide-react";
 import { BY_ID, DATA, MATCHES, NOW, OPS, dayKey, dayLabel, dayShort, isLive, pct } from "@/lib/data";
 import { Page, PageHeader, Reveal } from "@/components/ui-pz";
 import { JugadorCard, OportunidadCard, SENALES } from "@/components/oport";
@@ -35,12 +35,6 @@ export default function Fijas({ tab: initial = "fijas" }: { tab?: string }) {
         ))}
       </div>
 
-      {F.pausa && (
-        <div className="card mb-6 flex items-start gap-4 border-flare/40 p-5">
-          <PauseCircle className="h-6 w-6 shrink-0 text-flare" />
-          <p className="text-[15px] text-chalk-2"><b className="text-chalk">Fijas en pausa automática.</b> En los últimos 30 días acertaron claramente menos de lo que prometían. Se reanudan solas cuando se recuperen.</p>
-        </div>
-      )}
       {F.modo === "calibracion" && (
         <div className="card mb-6 flex items-start gap-4 p-5">
           <FlaskConical className="h-6 w-6 shrink-0 text-gold" />

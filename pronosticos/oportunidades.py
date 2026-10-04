@@ -278,15 +278,11 @@ def oportunidades_jugador(players_h: list, players_a: list, local: str, visita: 
 
 # ------------------------------------------------------------------ fijas del período
 def fijas(partidos: list, estado: dict, now: datetime, lima_day) -> dict:
-    """Las fijas son las oportunidades que pasaron todo. Máximo 1 por partido y 5 por día; pausa automática."""
-    f30 = estado.get("fijas_30d") or {}
-    pausa = (f30.get("n") or 0) >= 20 and (f30.get("acierto") or 1) < (f30.get("esperado") or 0) - 0.08
-    info = {"modo": estado.get("modo"), "pausa": pausa, "liquidados_30d": estado.get("liquidados_30d", 0),
+    """Las fijas son las oportunidades que pasaron todo. Máximo 1 por partido y 5 por día (siempre se publican)."""
+    info = {"modo": estado.get("modo"), "liquidados_30d": estado.get("liquidados_30d", 0),
             "criterios": {"min_n": MIN_N, "min_cuota": MIN_CUOTA, "max_cuota": MAX_CUOTA, "fija_puntaje": FIJA_PUNTAJE,
                           "margen": MARGEN, "max_dia": FIJAS_DIA, "volumen_30d": VOLUMEN_30D, "pesos": PESOS},
             "lista": []}
-    if pausa:
-        return info
     limit = now + timedelta(days=DIAS_FIJAS)
     cands = []
     for p in partidos:
