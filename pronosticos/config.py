@@ -10,6 +10,7 @@ LEAGUES = {
     "PER": {"name": "Liga 1",         "country": "Perú",       "fd": None,  "espn": "per.1"},
     "ARG": {"name": "Liga Profesional", "country": "Argentina", "fd": None,  "espn": "arg.1"},
     "MLS": {"name": "MLS",            "country": "Estados Unidos", "fd": None, "espn": "usa.1"},
+    "BRA": {"name": "Brasileirão",    "country": "Brasil",     "fd": None,  "espn": "bra.1"},
     "UWCL": {"name": "Champions Femenina", "country": "Europa", "fd": None, "espn": "uefa.wchampions"},
     "INT": {"name": "Selecciones",    "country": "Internacional", "fd": None, "espn": None},
 }
@@ -31,7 +32,7 @@ N_SEASONS_EUROPE = 4          # temporada actual + 3 anteriores
 N_YEARS_PERU = 3              # año actual + 2 anteriores
 
 # Ligas de calendario anual que salen solo de ESPN (resultados + estadísticas por año): código -> (slug, años)
-ESPN_ANUALES = {"ARG": ("arg.1", 3), "MLS": ("usa.1", 3)}
+ESPN_ANUALES = {"ARG": ("arg.1", 3), "MLS": ("usa.1", 3), "BRA": ("bra.1", 3)}
 ANUALES = ("PER", *ESPN_ANUALES)   # temporada = año calendario
 
 # Champions femenina: sus equipos juegan pocos partidos europeos, así que los ratings también aprenden de sus ligas

@@ -142,6 +142,20 @@
 /* grilla que reparte el ancho entre las tarjetas que haya (sin columnas vacías) */
 .fit-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); }
 .fit-grid > * { max-width: 640px; }
+/* mosaico parejo: la página fija las columnas por ancho (--c1…--c5) para repartir las filas;
+   si la última fila queda incompleta, sus tarjetas se estiran y no dejan huecos */
+.even-grid { --gap: .75rem; --cols: var(--c1, 2); display: flex; flex-wrap: wrap; gap: var(--gap); }
+.even-grid > * { flex: 1 1 calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols) - .5px); min-width: 0; }
+@media (min-width: 640px) { .even-grid { --cols: var(--c2, 3); } }
+@media (min-width: 768px) { .even-grid { --cols: var(--c3, 4); } }
+@media (min-width: 1024px) { .even-grid { --cols: var(--c4, 6); } }
+@media (min-width: 1280px) { .even-grid { --cols: var(--c5, 8); } }
+/* riel de chips con scroll lateral: se desvanece el borde del lado donde quedan más chips (ChipRail marca data-start/data-end) */
+.rail-fade { --fl: 0px; --fr: 28px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent); }
+.rail-fade[data-start="false"] { --fl: 28px; }
+.rail-fade[data-end="true"] { --fr: 0px; }
 
 /* fila de partido: apilada en espacios angostos, en columnas cuando la lista es ancha */
 .mrow { display: grid; grid-template-columns: 52px minmax(0,1fr) 14px; gap: 12px 12px; align-items: center; }

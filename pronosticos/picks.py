@@ -36,8 +36,10 @@ PICK_LABELS = [
     ("ht", ("primer_tiempo_goles", "0.5", "over"), "Hay gol en el 1er tiempo"),
     ("ht", ("primer_tiempo_goles", "1.5", "under"), "Menos de 1.5 goles en el 1er tiempo"),
     ("ht", ("primer_tiempo_goles", "1.5", "over"), "Más de 1.5 goles en el 1er tiempo"),
-    ("ah", ("handicap_asiatico_local", "-1", "gana"), "Hándicap asiático local -1"),
-    ("ah", ("handicap_asiatico_local", "+1", "pierde"), "Hándicap asiático visita -1"),
+    # línea entera: si gana por exactamente 1 se devuelve la apuesta, así que la probabilidad es condicional
+    # (P(gana) / (P(gana) + P(pierde)), igual que en empate no apuesta)
+    ("ah", ("handicap_asiatico_local", "-1", "gana_cond"), "Hándicap asiático local -1"),
+    ("ah", ("handicap_asiatico_local", "+1", "pierde_cond"), "Hándicap asiático visita -1"),
     ("ah", ("handicap_asiatico_local", "-1.5", "gana"), "Local gana por 2 o más"),
     ("ah", ("handicap_asiatico_local", "+1.5", "pierde"), "Visita gana por 2 o más"),
     ("co", ("corners", "total", "8.5", "over"), "Más de 8.5 córners"),
@@ -53,6 +55,13 @@ PICK_LABELS = [
 ]
 LABEL = {"|".join(p): l for _, p, l in PICK_LABELS}
 FAMILY = {"|".join(p): f for f, p, _ in PICK_LABELS}
+# Claves que ya no se generan pero siguen en el historial (se muestran y liquidan igual; no se mezclan con las nuevas).
+# Hasta el 2026-10-08 el hándicap -1/+1 se guardaba con la probabilidad sin condicionar (incluía la devolución).
+LEGACY = {"handicap_asiatico_local|-1|gana": ("ah", "Hándicap asiático local -1"),
+          "handicap_asiatico_local|+1|pierde": ("ah", "Hándicap asiático visita -1")}
+for _k, (_f, _l) in LEGACY.items():
+    LABEL.setdefault(_k, _l)
+    FAMILY.setdefault(_k, _f)
 
 
 # Rangos de probabilidad en los que se mide el historial de cada tipo de pick (cortes estadísticos, no niveles).
@@ -116,7 +125,7 @@ def settle(path, r: dict):
         diff = hg - ag + float(path[1])          # desde el punto de vista del local
         if diff == 0:
             return None
-        return diff > 0 if sel == "gana" else diff < 0
+        return diff > 0 if sel.startswith("gana") else diff < 0
     if m in ("corners", "tarjetas"):
         v = r.get("corners" if m == "corners" else "cards")
         return None if v is None else over(float(v), path[2])
@@ -134,16 +143,17 @@ def odds_for(o: dict | None) -> dict:
         out[f"goles_totales|{float(ln)}|under"] = o.get("under")
     ah = o.get("ah_line")
     if ah is not None:
-        out[f"handicap_asiatico_local|{float(ah):+g}|gana"] = o.get("ah_home")
-        out[f"handicap_asiatico_local|{float(ah):+g}|pierde"] = o.get("ah_away")
+        suf = "_cond" if float(ah).is_integer() else ""     # línea entera: la cuota paga con devolución
+        out[f"handicap_asiatico_local|{float(ah):+g}|gana{suf}"] = o.get("ah_home")
+        out[f"handicap_asiatico_local|{float(ah):+g}|pierde{suf}"] = o.get("ah_away")
     return {k: v for k, v in out.items() if v}
 
 
 # Grupos de competición: cada uno tiene su propio historial de aciertos (en selecciones hay más goleadas que en
 # las ligas europeas, así que un "Menos de 4.5" no vale lo mismo en ambos).
-GRUPOS = {"INT": "selecciones", "PER": "liga1", "ARG": "argentina", "MLS": "mls", "UWCL": "femenino"}
+GRUPOS = {"INT": "selecciones", "PER": "liga1", "ARG": "argentina", "MLS": "mls", "BRA": "brasil", "UWCL": "femenino"}
 NOMBRE_GRUPO = {"selecciones": "selecciones", "liga1": "la Liga 1", "argentina": "la Liga Argentina", "mls": "la MLS",
-                "femenino": "la Champions femenina", "clubes": "ligas europeas"}
+                "brasil": "el Brasileirão", "femenino": "la Champions femenina", "clubes": "ligas europeas"}
 
 
 def grupo(liga: str) -> str:

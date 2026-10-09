@@ -59,7 +59,7 @@ export default function Fijas({ tab: initial = "fijas" }: { tab?: string }) {
             <div key={k} className="spot rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/[0.06]">
               <div className="flex items-baseline justify-between"><b className="text-chalk">{l}</b><span className="num text-[12.5px] text-gold">{pct(pesos[k] ?? 0)}</span></div>
               <p className="mt-1.5 text-[13px] leading-relaxed text-chalk-2">{({
-                historial: "En ese tipo de pick y rango de probabilidad, ¿el modelo acertó lo que decía? Si exagera, se descarta.",
+                historial: "Funciona como veto y no suma puntos: si en ese tipo de pick, competición y rango de probabilidad el modelo exagera de forma comprobada, el pick se descarta.",
                 reciente: "En los últimos 8 partidos de cada equipo, ¿cuántas veces se cumplió? Tiene que ser al menos lo que dice el modelo.",
                 jugadores: "Goleadores en forma para picks de goles, tarjeteros para tarjetas. Si los jugadores contradicen el pick, se descarta.",
                 cuota: "Si la casa publica cuota, ¿paga más que la justa? Un valor mayor a +20% se marca para revisar.",
@@ -69,8 +69,8 @@ export default function Fijas({ tab: initial = "fijas" }: { tab?: string }) {
           ))}
         </div>
         <ul className="mt-5 grid gap-2 text-[14px] leading-relaxed text-chalk-2">
-          <li><b className="text-chalk">Oportunidad:</b> puntaje de 65 o más, cuota justa entre {c.min_cuota?.toFixed(2)} y {c.max_cuota?.toFixed(2)}. Hasta 3 por partido, sin repetir grupo de mercado.</li>
-          <li><b className="text-gold">Fija:</b> puntaje de {c.fija_puntaje} o más, el historial demuestra que la probabilidad real alcanza la cuota mínima y los últimos partidos la superan. Máximo 1 por partido y {c.max_dia} por día.</li>
+          <li><b className="text-chalk">Oportunidad:</b> puntaje de {c.min_puntaje ?? 74} o más, cuota justa entre {c.min_cuota?.toFixed(2)} y {c.max_cuota?.toFixed(2)}. Hasta 3 por partido, sin repetir grupo de mercado.</li>
+          <li><b className="text-gold">Fija:</b> puntaje de {c.fija_puntaje} o más, sin veto del historial y con los últimos partidos por encima de lo que dice el modelo. Máximo 1 por partido y {c.max_dia} por día.</li>
           <li><b className="text-chalk">"Apuesta si paga ≥":</b> la cuota justa más un {Math.round(((c.margen || 1.05) - 1) * 100)}% de margen. Si tu casa paga menos, no conviene aunque el pick sea bueno.</li>
         </ul>
       </div></Reveal>

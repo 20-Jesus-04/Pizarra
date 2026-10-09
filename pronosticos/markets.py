@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.stats import poisson
+from scipy.stats import nbinom, poisson
 
 from .model import score_matrix
 
@@ -27,8 +27,17 @@ def asian_handicap(M: np.ndarray, line: float):
     return settle(line)
 
 
+def count_cdf(k: int, mu: float, phi: float | None = None) -> float:
+    """P(X <= k) para un conteo con media mu: Poisson si phi es None, binomial negativa (tamaño phi) si no."""
+    if phi is None:
+        return float(poisson.cdf(k, mu))
+    return float(nbinom.cdf(k, phi, phi / (phi + mu)))
+
+
 def all_markets(lam: float, mu: float, rho: float, ht_frac: float = 0.44,
-                corners: tuple | None = None, cards: tuple | None = None) -> dict:
+                corners: tuple | None = None, cards: tuple | None = None, cc: dict | None = None) -> dict:
+    """cc: ajuste de córners y tarjetas por resultados reales, {"corners": (r, phi), "tarjetas": (r, phi)}:
+    la media esperada se multiplica por r y la distribución es binomial negativa con tamaño phi (None = Poisson)."""
     M = score_matrix(lam, mu, rho)
     n = M.shape[0]
     i, j = np.indices(M.shape)
@@ -67,6 +76,8 @@ def all_markets(lam: float, mu: float, rho: float, ht_frac: float = 0.44,
     for ln in (-2.5, -2, -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5):
         w, p, l = asian_handicap(M, ln)
         ah[f"{ln:+g}"] = {"gana": _r(w), "devuelve": _r(p), "pierde": _r(l)}
+        if float(ln).is_integer() and w + l > 0:    # sin contar la devolución (así se liquida)
+            ah[f"{ln:+g}"].update({"gana_cond": _r(w / (w + l)), "pierde_cond": _r(l / (w + l))})
     out["handicap_asiatico_local"] = ah
     cs = sorted(((M[a, b], f"{a}-{b}") for a in range(7) for b in range(7)), reverse=True)
     out["marcador_exacto"] = {k: _r(v) for v, k in cs[:12]}
@@ -106,19 +117,26 @@ def all_markets(lam: float, mu: float, rho: float, ht_frac: float = 0.44,
             htft[key] = htft.get(key, 0) + px * py
     out["descanso_final"] = {k: _r(v) for k, v in sorted(htft.items(), key=lambda z: -z[1])}
 
-    # ---- córners y tarjetas (Poisson sobre las tasas esperadas)
+    # ---- córners y tarjetas: tasas esperadas por el nivel real del grupo (r) y binomial negativa (phi)
+    cc = cc or {}
     if corners:
-        ch, ca = corners
+        r, phi = cc.get("corners") or (1.0, None)
+        base = corners[0] + corners[1]
+        ch, ca = corners[0] * r, corners[1] * r
         ct = ch + ca
         out["corners"] = {"esperados_local": _r(ch), "esperados_visita": _r(ca), "esperados_total": _r(ct),
-                          "total": {f"{ln}": {"over": _r(1 - poisson.cdf(int(ln), ct)), "under": _r(poisson.cdf(int(ln), ct))}
+                          "esperados_base": _r(base), "ajuste": {"r": _r(r), "phi": phi},
+                          "total": {f"{ln}": {"over": _r(1 - count_cdf(int(ln), ct, phi)), "under": _r(count_cdf(int(ln), ct, phi))}
                                     for ln in (7.5, 8.5, 9.5, 10.5, 11.5, 12.5)},
                           "mas_corners": _more(ch, ca)}
     if cards:
-        yh, ya = cards
+        r, phi = cc.get("tarjetas") or (1.0, None)
+        base = cards[0] + cards[1]
+        yh, ya = cards[0] * r, cards[1] * r
         yt = yh + ya
         out["tarjetas"] = {"esperadas_local": _r(yh), "esperadas_visita": _r(ya), "esperadas_total": _r(yt),
-                           "total": {f"{ln}": {"over": _r(1 - poisson.cdf(int(ln), yt)), "under": _r(poisson.cdf(int(ln), yt))}
+                           "esperadas_base": _r(base), "ajuste": {"r": _r(r), "phi": phi},
+                           "total": {f"{ln}": {"over": _r(1 - count_cdf(int(ln), yt, phi)), "under": _r(count_cdf(int(ln), yt, phi))}
                                      for ln in (2.5, 3.5, 4.5, 5.5, 6.5)}}
     return out
 

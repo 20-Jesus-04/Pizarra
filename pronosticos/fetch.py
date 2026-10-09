@@ -82,6 +82,19 @@ def _espn_year(slug: str, year: int) -> list[dict]:
     return (j or {}).get("events") or []
 
 
+MALFORMADO = (KeyError, IndexError, TypeError, StopIteration, AttributeError)   # evento de ESPN incompleto: se salta
+
+
+def _slim_all(events: list) -> list[dict]:
+    out = []
+    for e in events:
+        try:
+            out.append(_slim_event(e))
+        except MALFORMADO:
+            continue
+    return out
+
+
 def _slim_event(e: dict) -> dict:
     c = e["competitions"][0]
     return {
@@ -139,21 +152,21 @@ def fetch_all(verbose: bool = True) -> None:
     # 2) ESPN Perú (resultados + estadísticas)
     for y in range(now.year - N_YEARS_PERU + 1, now.year + 1):
         ev = _espn_year("per.1", y)
-        raw["espn"][str(y)] = [_slim_event(e) for e in ev]
+        raw["espn"][str(y)] = _slim_all(ev)
         log(f"  ESPN Liga 1 {y}: {len(ev)} partidos")
 
-    # 2a) otras ligas anuales solo de ESPN (Argentina)
+    # 2a) otras ligas anuales solo de ESPN (Argentina, MLS, Brasil)
     raw["espn_x"] = {}
     for code, (slug, n_years) in ESPN_ANUALES.items():
         for y in range(now.year - n_years + 1, now.year + 1):
-            raw["espn_x"].setdefault(code, {})[str(y)] = [_slim_event(e) for e in _espn_year(slug, y)]
+            raw["espn_x"].setdefault(code, {})[str(y)] = _slim_all(_espn_year(slug, y))
         log(f"  ESPN {slug}: {sum(len(v) for v in raw['espn_x'][code].values())} partidos")
 
     # 2b) Champions femenina + ligas domésticas de sus equipos (historia para los ratings)
     raw["espn_w"] = {}
     for slug in WOMEN_HISTORY:
         for y in range(now.year - N_YEARS_WOMEN + 1, now.year + 1):
-            raw["espn_w"].setdefault(slug, {})[str(y)] = [_slim_event(e) for e in _espn_year(slug, y)]
+            raw["espn_w"].setdefault(slug, {})[str(y)] = _slim_all(_espn_year(slug, y))
         log(f"  ESPN {slug}: {sum(len(v) for v in raw['espn_w'][slug].values())} partidos")
 
     # 3) ESPN próximos partidos (todas las ligas) + resultados recientes para mapear nombres
@@ -169,26 +182,30 @@ def fetch_all(verbose: bool = True) -> None:
             events += _espn_year(slug, y)
         seen, up, done = set(), [], []
         for e in events:
-            if e["id"] in seen:
+            try:
+                if e["id"] in seen:
+                    continue
+                seen.add(e["id"])
+                c = e["competitions"][0]
+                state = e["status"]["type"]["state"]
+                if state == "post":
+                    h = next(x for x in c["competitors"] if x["homeAway"] == "home")
+                    a = next(x for x in c["competitors"] if x["homeAway"] == "away")
+                    done.append([e["date"], h["team"]["displayName"], a["team"]["displayName"], h.get("score"), a.get("score"), e["id"]])
+                    if e["status"]["type"].get("completed") and e["date"] >= f"{now.year - 1}":
+                        prox["resultados"][e["id"]] = {"hg": _int(h.get("score")), "ag": _int(a.get("score")),
+                                                       "st": e["status"]["type"]["name"]}
+                else:
+                    up.append({
+                        "id": e["id"], "date": e["date"], "state": state, "season": (e.get("season") or {}).get("slug"),
+                        "venue": (c.get("venue") or {}).get("fullName"),
+                        "t": [{"ha": x["homeAway"], "id": x["team"]["id"], "name": x["team"]["displayName"],
+                               "abbr": x["team"].get("abbreviation"), "form": x.get("form"),
+                               "rec": ((x.get("records") or [{}])[0]).get("summary")} for x in c["competitors"]],
+                        "odds": _pick_odds((c.get("odds") or [None])[0]),
+                    })
+            except MALFORMADO:
                 continue
-            seen.add(e["id"])
-            c = e["competitions"][0]
-            state = e["status"]["type"]["state"]
-            if state == "post":
-                h = next(x for x in c["competitors"] if x["homeAway"] == "home")
-                a = next(x for x in c["competitors"] if x["homeAway"] == "away")
-                done.append([e["date"], h["team"]["displayName"], a["team"]["displayName"], h.get("score"), a.get("score"), e["id"]])
-                if e["status"]["type"].get("completed") and e["date"] >= f"{now.year - 1}":
-                    prox["resultados"][e["id"]] = {"hg": _int(h.get("score")), "ag": _int(a.get("score"))}
-            else:
-                up.append({
-                    "id": e["id"], "date": e["date"], "state": state, "season": (e.get("season") or {}).get("slug"),
-                    "venue": (c.get("venue") or {}).get("fullName"),
-                    "t": [{"ha": x["homeAway"], "id": x["team"]["id"], "name": x["team"]["displayName"],
-                           "abbr": x["team"].get("abbreviation"), "form": x.get("form"),
-                           "rec": ((x.get("records") or [{}])[0]).get("summary")} for x in c["competitors"]],
-                    "odds": _pick_odds((c.get("odds") or [None])[0]),
-                })
         prox["leagues"][slug] = up
         if lg["fd"]:
             top5[slug] = done
@@ -209,18 +226,23 @@ def fetch_all(verbose: bool = True) -> None:
                 continue
             comp = ((j.get("leagues") or [{}])[0]).get("name")
             for e in j.get("events") or []:
-                c = e["competitions"][0]
-                h = next(x for x in c["competitors"] if x["homeAway"] == "home")
-                a = next(x for x in c["competitors"] if x["homeAway"] == "away")
-                st = e["status"]["type"]
-                base = {"id": e["id"], "slug": slug, "comp": comp, "date": e["date"], "neutral": bool(c.get("neutralSite")),
-                        "venue": (c.get("venue") or {}).get("fullName"), "home": h["team"]["displayName"], "away": a["team"]["displayName"]}
-                if st["state"] == "post":
-                    if st["name"] in finals:
-                        intl["done"].append({**base, "hs": h.get("score"), "as": a.get("score"), "status": st["name"]})
-                else:
-                    intl["up"].append({**base, "state": st["state"], "hform": h.get("form"), "aform": a.get("form"),
-                                       "odds": _pick_odds((c.get("odds") or [None])[0])})
+                try:
+                    c = e["competitions"][0]
+                    h = next(x for x in c["competitors"] if x["homeAway"] == "home")
+                    a = next(x for x in c["competitors"] if x["homeAway"] == "away")
+                    st = e["status"]["type"]
+                    v = c.get("venue") or {}
+                    base = {"id": e["id"], "slug": slug, "comp": comp, "date": e["date"], "neutral": bool(c.get("neutralSite")),
+                            "venue": v.get("fullName"), "venue_country": (v.get("address") or {}).get("country"),
+                            "home": h["team"]["displayName"], "away": a["team"]["displayName"]}
+                    if st["state"] == "post":
+                        if st["name"] in finals:
+                            intl["done"].append({**base, "hs": h.get("score"), "as": a.get("score"), "status": st["name"]})
+                    else:
+                        intl["up"].append({**base, "state": st["state"], "hform": h.get("form"), "aform": a.get("form"),
+                                           "odds": _pick_odds((c.get("odds") or [None])[0])})
+                except MALFORMADO:
+                    continue
     log(f"  ESPN selecciones: {len(intl['up'])} próximos, {len(intl['done'])} jugados")
 
     # Si una fuente falló, se conserva lo que ya había en la caché en vez de dejar la web vacía.
@@ -255,7 +277,7 @@ def fetch_all(verbose: bool = True) -> None:
             intl = o_int
     prox["resultados"] = {**(old("proximos.json") or {}).get("resultados", {}), **prox["resultados"]}
     for e in intl.get("done", []):
-        prox["resultados"].setdefault(e["id"], {"hg": _int(e.get("hs")), "ag": _int(e.get("as"))})
+        prox["resultados"].setdefault(e["id"], {"hg": _int(e.get("hs")), "ag": _int(e.get("as")), "st": e.get("status")})
     prox["arbitros"] = fetch_referees(prox, intl, now, (old("proximos.json") or {}).get("arbitros", {}))
     log(f"  árbitros confirmados en ESPN: {len(prox['arbitros'])}")
     for name, obj in (("raw.json", raw), ("proximos.json", prox), ("espn_top5.json", top5), ("internacional.json", intl)):
@@ -324,10 +346,13 @@ def _clock(v):
 def summarize_event(j: dict, slug: str, lg: str, eid: str, date: str) -> dict:
     sub_in, sub_out = {}, {}
     for e in j.get("keyEvents") or []:
-        if (e.get("type") or {}).get("type") == "substitution" and len(e.get("participants") or []) >= 2:
-            m = _clock((e.get("clock") or {}).get("displayValue"))
-            sub_in[e["participants"][0]["athlete"]["id"]] = m
-            sub_out[e["participants"][1]["athlete"]["id"]] = m
+        try:
+            if (e.get("type") or {}).get("type") == "substitution" and len(e.get("participants") or []) >= 2:
+                m = _clock((e.get("clock") or {}).get("displayValue"))
+                sub_in[e["participants"][0]["athlete"]["id"]] = m
+                sub_out[e["participants"][1]["athlete"]["id"]] = m
+        except MALFORMADO:
+            continue
     teams = [{"id": t["team"]["id"], "name": t["team"]["displayName"], "ha": t.get("homeAway"),
               "st": {x["name"]: x.get("displayValue") for x in (t.get("statistics") or [])}}
              for t in ((j.get("boxscore") or {}).get("teams") or [])]
@@ -357,8 +382,11 @@ def summarize_event(j: dict, slug: str, lg: str, eid: str, date: str) -> dict:
     if ls.get("home") and ls.get("away"):
         ht = [_int(ls["home"][0].get("displayValue")), _int(ls["away"][0].get("displayValue"))]
     score = {c.get("homeAway"): _int(c.get("score")) for c in comps}
-    return {"id": eid, "slug": slug, "lg": lg, "comp": comp, "date": date, "ref": ref, "ht": ht,
-            "score": [score.get("home"), score.get("away")], "teams": teams, "players": players}
+    # goles por periodo (1T, 2T, prórroga, penales): con prórroga o penales se liquida con los 90 minutos
+    lsc = [[_int(x.get("displayValue")) for x in ls.get(k) or []] for k in ("home", "away")]
+    status = (((((j.get("header") or {}).get("competitions") or [{}])[0]).get("status") or {}).get("type") or {}).get("name")
+    return {"id": eid, "slug": slug, "lg": lg, "comp": comp, "date": date, "ref": ref, "ht": ht, "st": status,
+            "ls": lsc if all(lsc) else None, "score": [score.get("home"), score.get("away")], "teams": teams, "players": players}
 
 
 def fetch_players(verbose: bool = True, workers: int = 8) -> None:
@@ -378,15 +406,21 @@ def fetch_players(verbose: bool = True, workers: int = 8) -> None:
         since = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%MZ")
         for y in sorted({now.year - 1, now.year}):
             for e in _espn_year(slug, y):
-                if e["status"]["type"]["state"] == "post" and e["date"] >= since and e["id"] not in have:
-                    have.add(e["id"])
-                    todo.append((slug, lg, e["id"], e["date"]))
+                try:
+                    if e["status"]["type"]["state"] == "post" and e["date"] >= since and e["id"] not in have:
+                        have.add(e["id"])
+                        todo.append((slug, lg, e["id"], e["date"]))
+                except MALFORMADO:
+                    continue
     log(f"  jugadores: {len(todo)} partidos nuevos por descargar")
 
     def one(t):
         slug, lg, eid, date = t
         j = _espn(f"{slug}/summary", event=eid)
-        return summarize_event(j, slug, lg, eid, date) if j else None
+        try:
+            return summarize_event(j, slug, lg, eid, date) if j else None
+        except MALFORMADO:
+            return None
 
     with ThreadPoolExecutor(workers) as ex:
         for res in ex.map(one, todo):

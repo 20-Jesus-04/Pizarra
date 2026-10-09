@@ -33,6 +33,7 @@ NOMBRES = {"poisson": "Poisson", "dixon_coles": "Dixon-Coles", "elo": "Elo", "ba
 O25 = ["poisson", "dixon_coles", "bayes", "mercado", "xgboost"]   # modelos que estiman goles totales
 CACHE = os.path.join(DATA_DIR, "modelo.json")
 MAX_AGE_DAYS = 6
+VERSION = 4              # 4: feedback de resultados (córners/tarjetas por grupo, Platt sin mercado, celdas del veto)
 PICK_MIN = 0.385         # probabilidad mínima para guardar un pick simulado (cuota justa hasta 2.60)
 
 
@@ -234,8 +235,12 @@ def isotonic(x, y, w):
     return [[round(b[0], 4), round(b[1], 4)] for b in blocks]
 
 
-def simulate_picks(bt: pd.DataFrame) -> pd.DataFrame:
-    """Para cada partido del backtest: matriz del ensamble -> todos los tipos de pick -> ¿se ganó?"""
+def simulate_picks(bt: pd.DataFrame, cc_bt: dict | None = None) -> pd.DataFrame:
+    """Para cada partido del backtest: matriz del ensamble -> todos los tipos de pick -> ¿se ganó?
+    cc_bt: nivel y dispersión de córners/tarjetas por grupo (feedback.cc_backtest), igual que en producción.
+    src: "mercado" si el partido tenía cuotas (el ensamble usó el mercado), "modelo" si no."""
+    from .feedback import cc_markets
+    from .picks import FAMILY, grupo
     out = []
     for r in bt.itertuples():
         if pd.isna(r.ens_H) or pd.isna(r.ens_O):
@@ -243,9 +248,11 @@ def simulate_picks(bt: pd.DataFrame) -> pd.DataFrame:
         lam, mu = implied_rates_fast(r.ens_H, r.ens_A, r.ens_O, r.rho, r.dc_lam, r.dc_mu)
         corners = (r.c_h, r.c_a) if not pd.isna(getattr(r, "c_h", np.nan)) else None
         cards = (r.y_h * r.y_fac, r.y_a * r.y_fac) if not pd.isna(getattr(r, "y_h", np.nan)) else None
-        mk = all_markets(lam, mu, r.rho, r.ht_frac, corners, cards)
+        mk = all_markets(lam, mu, r.rho, r.ht_frac, corners, cards, cc_markets((cc_bt or {}).get(grupo(r.lg))))
         res = {"hg": r.hg, "ag": r.ag, "hthg": r.hthg, "htag": r.htag,
                "corners": getattr(r, "corners", None), "cards": getattr(r, "cards", None)}
+        src = "modelo" if pd.isna(getattr(r, "mercado_H", np.nan)) else "mercado"
+        mid = f"{r.lg}:{r.ix}"
         for _, path, _ in PICK_LABELS:
             p = get(mk, path)
             if p is None or p < PICK_MIN:
@@ -254,8 +261,8 @@ def simulate_picks(bt: pd.DataFrame) -> pd.DataFrame:
             if ok is None:
                 continue
             l1, l2, l3 = levels(path)
-            out.append((r.date, r.lg, l1, l2, l3, float(p), bool(ok)))
-    return pd.DataFrame(out, columns=["date", "lg", "l1", "l2", "l3", "p", "ok"])
+            out.append((r.date, r.lg, l1, l2, l3, float(p), bool(ok), src, mid, FAMILY.get(l1, path[0])))
+    return pd.DataFrame(out, columns=["date", "lg", "l1", "l2", "l3", "p", "ok", "src", "mid", "fam"])
 
 
 def calibration(picks: pd.DataFrame) -> tuple[list, list]:
@@ -331,10 +338,15 @@ def calibrar(leagues: dict, now=None, verbose=True, P=None) -> dict:
     bt = xgb_walk_forward(bt, feats)
     log(f"  XGBoost walk-forward ({time.time() - t:.0f}s)")
     pesos, ev, bt = ensemble_weights(bt)
+    from .feedback import cc_backtest, celdas_backtest, platt_backtest
+    cc_bt = cc_backtest(bt)
     t = time.time()
-    picks = simulate_picks(bt)
+    picks = simulate_picks(bt, cc_bt)
     log(f"  picks simulados: {len(picks)} ({time.time() - t:.0f}s)")
     tabla_cal, curva = calibration(picks)
+    platt_bt = platt_backtest(picks, curva)
+    celdas = celdas_backtest(picks, curva, platt_bt)
+    log(f"  feedback: córners/tarjetas {cc_bt} · Platt sin mercado {platt_bt} · {len(celdas)} celdas")
     # métricas por liga (formato del backtest anterior, ahora con el ensamble como "modelo")
     ligas = {}
     for code, g in bt.groupby("lg"):
@@ -347,7 +359,8 @@ def calibrar(leagues: dict, now=None, verbose=True, P=None) -> dict:
     refp = pd.concat(refs, ignore_index=True) if refs else pd.DataFrame()
     arb = validate_refs(refp) if not refp.empty else {"n": 0}
     arb["k"] = REF_K
-    out = {"version": 3, "fecha": now.isoformat(), "segundos": round(time.time() - t0),
+    out = {"version": VERSION, "fecha": now.isoformat(), "segundos": round(time.time() - t0),
+           "cc_backtest": cc_bt, "platt_backtest": platt_bt, "celdas": celdas,
            "pesos": pesos, "evaluacion": ev, "calibracion": tabla_cal, "curva": curva,
            "subtipos": subtype_stats(picks), "subtipos_grupo": subtype_stats_grupo(picks), "goles_backtest": goles_backtest(bt),
            "niveles": band_summary(picks), "picks_simulados": int(len(picks)),
@@ -379,7 +392,7 @@ def save_cache(c):
 
 
 def cache_is_fresh(c, now) -> bool:
-    if not c or c.get("version") != 3:
+    if not c or c.get("version") != VERSION:
         return False
     age = (now - datetime.fromisoformat(c["fecha"])).total_seconds() / 86400
     return age < MAX_AGE_DAYS

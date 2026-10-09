@@ -167,6 +167,11 @@ function usePaged<T>(list: T[], porPagina = POR_PAGINA) {
   return { ref, pg, pages, go, reset: () => setPage(0), view: list.slice(pg * porPagina, (pg + 1) * porPagina) };
 }
 
+/** Resultado cargado a mano (con fuente pública) cuando ESPN no lo publicó. */
+function ManualTag({ x }: { x: any }) {
+  return x.manual ? <span className="tag ml-1.5 bg-white/10 text-chalk-2" title="Resultado cargado a mano con fuente pública">Manual</span> : null;
+}
+
 function TipoTag({ t }: { t: string }) {
   if (t === "fija") return <span className="tag mr-1.5 bg-gold-soft text-gold">Fija</span>;
   if (t === "destacada" || t === "oportunidad") return <span className="tag mr-1.5 bg-cobalt-soft text-cobalt">Oport.</span>;
@@ -207,7 +212,7 @@ function Liquidados({ items }: { items: any[] }) {
               <li key={`${x.id}-${x.seleccion}-${i}`} className={`flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 ring-1 ${x.acierto ? "bg-turf-soft/40 ring-turf/20" : "bg-flare/5 ring-flare/20"}`}>
                 <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${x.acierto ? "bg-turf text-night-900" : "bg-flare text-white"}`}>{x.acierto ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-semibold"><TipoTag t={x.tipo} />{x.seleccion}</div>
+                  <div className="truncate text-[14px] font-semibold"><TipoTag t={x.tipo} />{x.seleccion}<ManualTag x={x} /></div>
                   <div className="truncate text-[12.5px] text-chalk-3">{fechaCorta(x.fecha)} · {x.local} {x.marcador} {x.visita}</div>
                 </div>
                 <span className="num text-[13px] text-chalk-2">{pct(x.prob)}</span>
@@ -221,7 +226,7 @@ function Liquidados({ items }: { items: any[] }) {
                 {P.view.map((x: any, i: number) => (
                   <tr key={`${x.id}-${x.seleccion}-${i}`}>
                     <td><span className="text-[12px] text-chalk-3">{fechaCorta(x.fecha)}</span> {x.local} – {x.visita}</td>
-                    <td><TipoTag t={x.tipo} />{x.seleccion}</td>
+                    <td><TipoTag t={x.tipo} />{x.seleccion}<ManualTag x={x} /></td>
                     <td className="n">{pct(x.prob)}</td><td className="n">{x.marcador}</td>
                     <td className="n">{x.acierto ? <Check className="ml-auto h-4 w-4 text-turf" aria-label="acierto" /> : <X className="ml-auto h-4 w-4 text-flare" aria-label="fallo" />}</td>
                   </tr>

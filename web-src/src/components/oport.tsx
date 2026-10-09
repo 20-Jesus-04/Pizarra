@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { ChevronDown, ShieldCheck, Sparkles, User } from "lucide-react";
-import { compName, dayKey, dayShort, fTime, pct, prettyAlt } from "@/lib/data";
+import { compName, dayKey, dayShort, esFija, fTime, pct, prettyAlt } from "@/lib/data";
 import { Badge, HA, Ring } from "@/components/ui-pz";
 
 export const SENALES: [string, string][] = [["historial", "Historial"], ["reciente", "Recientes"], ["jugadores", "Jugadores"], ["cuota", "Cuota"], ["probabilidad", "Probabilidad"]];
@@ -14,10 +14,11 @@ const ringColor = (s: number) => (s >= 75 ? "#2FE0A0" : s >= 65 ? "#FFC23D" : "#
 export function OportunidadCard({ o, p, compact = false, showMatch = true }: { o: any; p?: any; compact?: boolean; showMatch?: boolean }) {
   const [open, setOpen] = useState(false);
   const sel = p ? prettyAlt(p, o.seleccion) : o.seleccion;
+  const fija = esFija(p, o);
   const link = p && showMatch;
   const Wrap: any = link ? "a" : "div";
   return (
-    <div className={`spot lift card relative flex h-full flex-col overflow-hidden ${o.fija ? "glow-border" : ""}`}>
+    <div className={`spot lift card relative flex h-full flex-col overflow-hidden ${fija ? "glow-border" : ""}`}>
       <Wrap {...(link ? { href: `#p.${p.id}` } : {})} className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
         {link && (
           <div className="flex items-center justify-between gap-2 text-[12px] font-semibold text-chalk-3">
@@ -34,7 +35,7 @@ export function OportunidadCard({ o, p, compact = false, showMatch = true }: { o
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap gap-1.5">
-              {o.fija && <span className="tag bg-gold text-night-900"><ShieldCheck className="h-3 w-3" />Fija</span>}
+              {fija && <span className="tag bg-gold text-night-900"><ShieldCheck className="h-3 w-3" />Fija</span>}
               {o.ev != null && o.ev > 0.03 && !o.valor_sospechoso && <span className="tag bg-turf-soft text-turf"><Sparkles className="h-3 w-3" />Valor {`+${(o.ev * 100).toFixed(0)}%`}</span>}
               {o.valor_sospechoso && <span className="tag bg-flare/15 text-flare">Revisar cuota</span>}
             </div>

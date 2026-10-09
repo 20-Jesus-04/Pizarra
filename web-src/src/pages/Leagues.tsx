@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Trophy } from "lucide-react";
 import { LG, pct } from "@/lib/data";
-import { Badge, Counter, Meter, Page, PageHeader, Reveal, Ring } from "@/components/ui-pz";
+import { Badge, ChipRail, Counter, Meter, Page, PageHeader, Reveal, Ring } from "@/components/ui-pz";
 
 export default function Leagues({ code }: { code: string }) {
   const L = LG[code] || LG.E0;
@@ -11,9 +11,11 @@ export default function Leagues({ code }: { code: string }) {
   return (
     <Page>
       <PageHeader eyebrow={L.country} title={L.name} sub={`${(L.partidos_historicos || 0).toLocaleString("es-PE")} partidos analizados desde ${L.desde}. Temporada ${L.temporada}.`} />
-      <div className="scrollbar-none -mx-4 mb-8 flex snap-x gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
+      {/* móvil: una fila con scroll lateral; desde tablet, todas las ligas a la vista en varias líneas */}
+      <ChipRail active={code} aria-label="Liga"
+        className="scrollbar-none rail-fade -mx-4 mb-8 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 sm:-mx-6 sm:scroll-px-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:[-webkit-mask-image:none] md:[mask-image:none]">
         {Object.entries(LG).map(([k, l]: any) => <a key={k} className="chip snap-start" href={`#liga.${k}`} aria-current={k === code}>{l.name}</a>)}
-      </div>
+      </ChipRail>
 
       <div key={code} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="row-in spot lift card flex items-center gap-4 p-5">

@@ -5,12 +5,28 @@ import { BY_ID, DATA, LG, MATCHES, NOW, OPS, TODAY, dayKey, longDate, topPicks, 
 import { Counter, Pitch, Reveal, SectionHead, Ticket } from "@/components/ui-pz";
 import { OportunidadCard } from "@/components/oport";
 
+/** Columnas para repartir n tarjetas en filas parejas sin pasar de `max`.
+ *  Prioriza: ninguna fila con una sola tarjeta > menos filas > última fila más llena > más columnas. */
+function evenCols(n: number, max: number) {
+  if (n <= max) return Math.max(1, n);
+  let best = max, bestKey = -Infinity;
+  for (let c = max; c >= Math.max(2, Math.ceil(max / 2)); c--) {
+    const rows = Math.ceil(n / c), last = n % c || c;
+    const key = (last === 1 ? 0 : 1000) - rows * 10 + last / c;
+    if (key > bestKey) { bestKey = key; best = c; }
+  }
+  return best;
+}
+
 export default function Home() {
   const picks = topPicks(7);
   const hero = picks[0], rest = picks.slice(1);
   const hist = Object.values(LG).reduce((s: number, l: any) => s + l.partidos_historicos, 0);
   const intAcc = LG.INT?.backtest?.acierto_modelo;
   const counts = Object.fromEntries(Object.keys(LG).map((c) => [c, MATCHES.filter((p) => p.liga === c).length]));
+  const nLg = Object.keys(LG).length;
+  // máximo de columnas por ancho (base, 640, 768, 1024, 1280): ver .even-grid en index.css
+  const lgCols = Object.fromEntries([2, 3, 4, 6, 8].map((m, i) => [`--c${i + 1}`, evenCols(nLg, m)]));
   const reduce = useReducedMotion();
   const { scrollY } = useScroll();
   const yPitch = useTransform(scrollY, [0, 600], [0, 120]);
@@ -41,7 +57,7 @@ export default function Home() {
             </h1>
             <p style={{ animationDelay: "0.55s" }}
               className="enter mt-6 max-w-[54ch] text-[clamp(16px,1.7vw,19px)] leading-relaxed text-chalk-2">
-              CuchiFijas calcula la probabilidad real de cada resultado en las 5 grandes ligas de Europa, la Liga 1, la Liga Argentina, la MLS, la Champions femenina y las selecciones, y te avisa cuando la cuota de tu casa paga más de lo que debería.
+              CuchiFijas estima la probabilidad de cada resultado en {nLg} competiciones, de las 5 grandes ligas de Europa a la Liga 1{LG.BRA ? ", el Brasileirão" : ""} y las selecciones, y te avisa cuando la cuota de tu casa paga más de lo que debería.
             </p>
             <div style={{ animationDelay: "0.7s" }} className="enter mt-8 flex flex-col gap-3 min-[420px]:flex-row min-[420px]:flex-wrap">
               <motion.a whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }} href="#partidos"
@@ -125,7 +141,7 @@ export default function Home() {
           <div className="grid gap-5 md:grid-cols-3">
             {[
               [Search, "Elige un partido", "En una frase ves quién es favorito, cuántos goles se esperan y qué opciones son más probables."],
-              [Coins, "Mira la cuota justa", "Es lo mínimo que debería pagar una apuesta según su probabilidad real. Un 80% vale 1.25."],
+              [Coins, "Mira la cuota justa", "Es lo mínimo que debería pagar una apuesta según su probabilidad. Un 80% vale 1.25."],
               [ShieldCheck, "Compara con tu casa", "Si tu casa paga más que la cuota justa, hay valor. Si paga menos, mejor déjala pasar."],
             ].map(([Icon, t, d]: any, i) => (
               <Reveal key={i}>
@@ -143,13 +159,13 @@ export default function Home() {
 
       {/* LIGAS */}
       <section className="mx-auto max-w-[1560px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <Reveal><SectionHead eyebrow={`${Object.keys(LG).length} competiciones`} title="Elige tu liga" /></Reveal>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        <Reveal><SectionHead eyebrow={`${nLg} competiciones`} title="Elige tu liga" /></Reveal>
+        <div className="even-grid" style={lgCols}>
           {Object.entries(LG).map(([c, l]: any) => (
             <a key={c} href={`#partidos.${c}`} className="reveal spot lift card group flex flex-col gap-1 p-4 hover:border-gold/40">
               <span className="text-[12px] text-chalk-3">{l.country}</span>
               <span className="font-display text-[18px] font-extrabold" style={{ fontStretch: "112%" }}>{l.name}</span>
-              <span className="mt-2 text-[13px] text-chalk-2"><span className="num text-gold">{counts[c]}</span> partidos</span>
+              <span className="mt-auto pt-2 text-[13px] text-chalk-2"><span className="num text-gold">{counts[c]}</span> partidos</span>
             </a>
           ))}
         </div>

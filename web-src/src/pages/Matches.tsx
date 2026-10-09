@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { DATA, DATA_AGE_H, LG, MATCHES, compName, dayKey, dayLabel, dayShort, fTime, favLabel, isLive, longDate, pct, picksFor, prettyAlt } from "@/lib/data";
-import { Badge, HA, Page, PageHeader } from "@/components/ui-pz";
+import { Badge, ChipRail, HA, Page, PageHeader } from "@/components/ui-pz";
 
 const FIJAS = new Set((DATA.fijas?.lista || []).map((f: any) => f.id));
 
@@ -37,7 +37,8 @@ export default function Matches({ lg }: { lg: string | null }) {
       <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-8 2xl:grid-cols-[280px_minmax(0,1fr)] 2xl:gap-10">
         {/* filtros: panel lateral en escritorio */}
         <aside className="hidden lg:block">
-          <div className="sticky top-[88px] flex flex-col gap-4">
+          {/* con muchas ligas o pantallas bajas, el panel se desplaza por dentro en vez de quedar cortado */}
+          <div className="sticky top-[88px] flex max-h-[calc(100dvh-104px)] flex-col gap-4 overflow-y-auto pb-1 [scrollbar-width:thin] [&>*]:shrink-0">
             {search}
             <nav aria-label="Liga" className="card flex flex-col p-2">
               {[["", "Todas", MATCHES.length], ...Object.entries(LG).map(([c, l]: any) => [c, l.name, counts[c]])].map(([c, name, n]: any) => {
@@ -65,16 +66,16 @@ export default function Matches({ lg }: { lg: string | null }) {
           {/* filtros: barra fija en móvil y tablet */}
           <div className="sticky top-[60px] z-30 -mx-4 flex flex-col gap-3 border-b border-white/[0.06] bg-night-900/85 px-4 pb-3 pt-3 backdrop-blur-xl sm:-mx-6 sm:top-[68px] sm:px-6 lg:hidden">
             {search}
-            <div className="scrollbar-none -mx-4 flex snap-x gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6" role="group" aria-label="Liga">
+            <ChipRail active={lg} className="scrollbar-none rail-fade -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 sm:-mx-6 sm:scroll-px-6 sm:px-6" role="group" aria-label="Liga">
               <a className="chip snap-start" href="#partidos" aria-current={!lg}>Todas <span className="num text-[12px] opacity-60">{MATCHES.length}</span></a>
               {Object.entries(LG).map(([c, l]: any) => (
                 <a key={c} className="chip snap-start" href={`#partidos.${c}`} aria-current={lg === c}>{l.name} <span className="num text-[12px] opacity-60">{counts[c]}</span></a>
               ))}
-            </div>
+            </ChipRail>
           </div>
 
           {!q && (
-            <div className="scrollbar-none -mx-4 mt-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:mt-0 lg:px-0" role="group" aria-label="Día">
+            <div className="scrollbar-none -mx-4 mt-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:mt-0 lg:scroll-px-0 lg:px-0" role="group" aria-label="Día">
               {days.slice(0, 14).map((d) => (
                 <button key={d} onClick={() => setDay(d)} aria-pressed={d === dsel}
                   className={`relative shrink-0 snap-start rounded-xl px-4 py-2 text-left transition ${d === dsel ? "text-night-900" : "text-chalk-2 hover:bg-white/5"}`}>
@@ -92,14 +93,14 @@ export default function Matches({ lg }: { lg: string | null }) {
 
           <div className="mb-3 mt-6 flex items-center gap-3">
             <h2 className="font-display text-[15px] font-extrabold uppercase tracking-[0.06em] text-chalk-3" style={{ fontStretch: "112%" }}>
-              {q ? `Resultados para "${q}"` : dayLabel(dsel || "")}
+              {q ? `Resultados para "${q}"` : dsel ? dayLabel(dsel) : "Próximos días"}
             </h2>
             <span className="h-px flex-1 bg-white/[0.07]" />
             <span className="num text-[12.5px] text-chalk-3">{items.length}</span>
           </div>
 
           <div key={(q || dsel) + (lg || "")} className="cq flex flex-col gap-2.5 pb-8">
-            {items.length ? items.map((p, i) => <Row key={p.id} p={p} delay={Math.min(i, 12) * 0.035} />) : <div className="card p-10 text-center text-chalk-3">No hay partidos para esta selección.</div>}
+            {items.length ? items.map((p, i) => <Row key={p.id} p={p} delay={Math.min(i, 12) * 0.035} />) : <div className="card p-10 text-center text-chalk-3">{!q && !days.length ? "No hay partidos programados de esta competición en los próximos días." : "No hay partidos para esta selección."}</div>}
           </div>
           <p className="text-[13.5px] text-chalk-3">El porcentaje junto a cada equipo es su probabilidad de ganar. <a href="#metodo" className="font-semibold text-gold hover:underline">¿Cómo se calcula?</a></p>
         </div>
@@ -126,7 +127,7 @@ function Row({ p, delay = 0 }: { p: any; delay?: number }) {
       <div className="self-start pt-1">
         {live ? <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11.5px] font-bold text-flare"><span className="live-dot h-2 w-2 rounded-full bg-flare" />VIVO</span>
           : <div className="num text-[16px] font-semibold leading-none text-chalk">{fTime(p.fecha)}</div>}
-        <div className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-tight text-chalk-3">{compName(p)}</div>
+        <div className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-tight text-chalk-3 [overflow-wrap:anywhere] hyphens-auto">{compName(p)}</div>
       </div>
       <div className="flex min-w-0 flex-col gap-2">
         {team(p.local, x["1"], x["1"] >= x["2"] && x["1"] >= 0.45, "L")}

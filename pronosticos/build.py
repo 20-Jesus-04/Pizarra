@@ -23,7 +23,7 @@ from .markets import all_markets
 from .stats import team_profile, head_to_head, standings, rate_model
 from .players import load_player_data, squad_projection, compact, PKEYS, team_stat_markets, team_rate_predictor
 from .picks import PICK_LABELS, get as _get, grupo as grupo_de
-from . import arbitros, auditor, ensamble, historial, oportunidades
+from . import arbitros, auditor, ensamble, feedback, historial, oportunidades
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -61,9 +61,12 @@ def ah_ev(mk, line_home, odds_h, odds_a):
     return out
 
 
-def best_alternatives(mk, curva=None, lo=0.62, hi=0.93, n=5):
+def best_alternatives(mk, curva=None, lo=0.62, hi=0.93, n=5, excluir=()):
+    """excluir: familias que no pueden ser pick principal (córners en selecciones mientras la puerta esté cerrada)."""
     cands = []
     for fam, path, label in PICK_LABELS:
+        if fam in excluir:
+            continue
         p = _get(mk, path)
         if p is None or not (lo <= p <= hi):
             continue
@@ -204,8 +207,10 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
     res = historial.metricas(hist, now, lima_day)
     estado = {"liquidados_30d": res.get("liquidados_30d", 0)}
     estado["modo"] = "real" if estado["liquidados_30d"] >= oportunidades.VOLUMEN_30D else "calibracion"
-    reales = historial.subtipos_reales(hist)
-    reales_g = {g: historial.subtipos_reales(hist, g) for g in {grupo_de(c) for c in leagues}}
+    # feedback: lo liquidado corrige córners/tarjetas, la calibración sin mercado y el veto del historial
+    fbk = feedback.calcular(hist, cache)
+    print(f"Feedback: Platt sin mercado {fbk['platt']} · córners selecciones {fbk['cc'].get('selecciones', {}).get('corners')} · "
+          f"puerta córners {fbk['puerta_corners']}")
 
     # 3) cada próximo partido
     for u in upcoming:
@@ -246,7 +251,8 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
         if arb:
             arb = {**arb, "tarjetas_sin_arbitro": round(sum(cards_base), 2) if cards_base else None,
                    "tarjetas_con_arbitro": round(sum(cards), 2) if cards else None}
-        mk = all_markets(lam, mu, dc.rho, dc.ht_frac, corners, cards)
+        g = grupo_de(code)
+        mk = all_markets(lam, mu, dc.rho, dc.ht_frac, corners, cards, feedback.cc_markets(fbk["cc"].get(g)))
         jugadores = {"local": [], "visita": []}
         sq_h = sq_a = []
         if T is not None:
@@ -301,7 +307,7 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
             "arbitro": arb,
             "auditoria": audit,
             "mercados": mk, "valor": sorted(value, key=lambda r: -r["ev"]),
-            "alternativas": best_alternatives(mk, curva),
+            "alternativas": best_alternatives(mk, curva, excluir=("co",) if feedback.corners_bloqueados(fbk, g) else ()),
             "confianza": round(conf, 2), "desacuerdo_modelo_mercado": disagreement,
             "perfil_local": team_profile(df, u["home"], cur), "perfil_visita": team_profile(df, u["away"], cur),
             "h2h": head_to_head(df, u["home"], u["away"]),
@@ -310,8 +316,7 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
         })
         # oportunidades: modelo + historial del pick + partidos recientes + jugadores + cuota
         pj = out["partidos"][-1]
-        g = grupo_de(code)
-        ctx = oportunidades.contexto(df, u["home"], u["away"], sq_h, sq_a, cache, reales, estado["modo"], g, reales_g.get(g))
+        ctx = oportunidades.contexto(df, u["home"], u["away"], sq_h, sq_a, cache, g, "mercado" if market else "modelo", fbk)
         pj["oportunidades"] = oportunidades.analizar(pj, ctx)
         pj["destacada"] = pj["oportunidades"][0] if pj["oportunidades"] else None
         pj["oportunidades_jugador"] = oportunidades.oportunidades_jugador(
@@ -348,6 +353,7 @@ def run(offline=False, backtest=True, out_dir=None, recalibrar=False):
     out["metodologia"] = {k: cache.get(k) for k in ("fecha", "pesos", "evaluacion", "calibracion", "arbitros", "picks_simulados",
                                                     "acierto_simulado_70", "nombres", "niveles")}
     out["metodologia"]["arbitros_conocidos"] = {c: len(t) for c, t in ref_tabs.items()}
+    out["metodologia"]["feedback"] = feedback.resumen(fbk)
     write_web(out, out_dir)
     return out
 
@@ -358,13 +364,15 @@ def write_web(out, out_dir=None):
     import re
     out_dir = out_dir or os.path.join(ROOT, "docs")
     os.makedirs(out_dir, exist_ok=True)
-    payload = json.dumps(out, ensure_ascii=False, default=_json_default)
+    # JSON estricto: NaN/infinito -> null antes de serializar (allow_nan=False falla si se cuela alguno)
+    payload = json.dumps(historial.limpio(out), ensure_ascii=False, default=_json_default, allow_nan=False)
     with open(os.path.join(out_dir, "data.json"), "w", encoding="utf-8") as f:
         f.write(payload)
     with open(os.path.join(ROOT, "web", "app.html"), encoding="utf-8") as f:
         app = f.read()
-    safe = payload.replace("</", "<\\/")
-    app = app.replace("__PIZARRA_DATA__", safe.replace("\\", "\\\\") if False else safe, 1)
+    # dentro de <script type=application/json>: ningún "<" literal (no puede cerrar la etiqueta ni abrir otra)
+    safe = payload.replace("<", "\\u003c")
+    app = app.replace("__PIZARRA_DATA__", safe, 1)
     # limpiar envoltorio del bundle
     for pat in (r"<!DOCTYPE html>", r"<!doctype html>", r"<html[^>]*>", r"</html>", r"<head>", r"</head>", r"<body>", r"</body>",
                 r"<meta[^>]*>", r"<title>[^<]*</title>"):
@@ -397,8 +405,9 @@ def write_web(out, out_dir=None):
 
 
 def _json_default(o):
+    """Solo para tipos que json no sabe serializar (los float de numpy no pasan por aquí: los limpia historial.limpio)."""
     if isinstance(o, (np.floating,)):
-        return None if np.isnan(o) else float(o)
+        return float(o) if np.isfinite(o) else None
     if isinstance(o, (np.integer,)):
         return int(o)
     if isinstance(o, (pd.Timestamp, datetime)):

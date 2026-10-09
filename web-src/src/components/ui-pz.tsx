@@ -251,6 +251,44 @@ export function PageHeader({ eyebrow, title, sub, actions, stats, crumbs }: {
   );
 }
 
+/** Fila de chips con scroll lateral: mantiene a la vista el chip activo (aria-current="true"), aunque haya muchas ligas. */
+export function ChipRail({ children, active, className = "", ...rest }: { children: ReactNode; active: string | null; className?: string; role?: string; "aria-label"?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const first = useRef(true);
+  useEffect(() => {
+    const el = ref.current;
+    const on = el?.querySelector<HTMLElement>('[aria-current="true"]');
+    const initial = first.current; first.current = false;
+    if (!el || !on || el.scrollWidth <= el.clientWidth + 1) return;
+    // lo ideal es centrarlo, pero el riel tiene scroll-snap: se elige el punto de anclaje más cercano
+    // al centro que deje el chip entero a la vista (fuera del borde desvanecido), así el snap no lo mueve
+    const pad = parseFloat(getComputedStyle(el).scrollPaddingLeft) || 0, max = el.scrollWidth - el.clientWidth;
+    const want = Math.min(max, Math.max(0, on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2));
+    const fits = (x: number) => on.offsetLeft - x >= pad - 1 && on.offsetLeft + on.offsetWidth - x <= el.clientWidth - (x >= max - 1 ? 0 : 28);
+    let left = want, bestD = Infinity;
+    for (const c of Array.from(el.children) as HTMLElement[]) {
+      const x = Math.min(max, Math.max(0, c.offsetLeft - pad)), d = Math.abs(x - want);
+      if (d < bestD && fits(x)) { bestD = d; left = x; }
+    }
+    const smooth = !initial && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollTo({ left: Math.max(0, left), behavior: smooth ? "smooth" : "auto" });
+  }, [active]);
+  // marca si quedan chips a cada lado (lo usa .rail-fade para desvanecer solo ese borde)
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const mark = () => {
+      el.dataset.start = String(el.scrollLeft <= 2);
+      el.dataset.end = String(el.scrollLeft + el.clientWidth >= el.scrollWidth - 2);
+    };
+    mark();
+    el.addEventListener("scroll", mark, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(mark) : null;
+    ro?.observe(el);
+    return () => { el.removeEventListener("scroll", mark); ro?.disconnect(); };
+  }, []);
+  return <div ref={ref} className={`relative ${className}`} {...rest}>{children}</div>;
+}
+
 /** Contenedor de página con ancho y márgenes consistentes. */
 export function Page({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-[1560px] px-4 pb-24 sm:px-6 lg:px-8 ${className}`}>{children}</div>;

@@ -3,8 +3,13 @@
 function readData(): any {
   const el = document.getElementById("pz-data");
   const txt = el?.textContent?.trim() ?? "";
-  if (!txt || txt.startsWith("__")) return { partidos: [], ligas: {}, config: { kelly: 0.25, dias: 21 }, pkeys: [], generado: new Date().toISOString() };
-  return JSON.parse(txt);
+  const vacio = () => ({ partidos: [], ligas: {}, config: { kelly: 0.25, dias: 21 }, pkeys: [], generado: new Date().toISOString() });
+  if (!txt || txt.startsWith("__")) return vacio();
+  try {
+    return JSON.parse(txt);
+  } catch {
+    return vacio();   // datos rotos: la página carga vacía en vez de quedar en blanco
+  }
 }
 export const DATA: any = readData();
 export const LG: Record<string, any> = DATA.ligas;
@@ -39,6 +44,9 @@ const COMP_ES: Record<string, string> = {
   "FIFA World Cup Qualifying - AFC": "Eliminatorias AFC", "AFC Asian Cup Qualifiers": "Eliminatorias Copa Asia",
   "Africa Cup of Nations": "Copa África", "Concacaf Gold Cup": "Copa Oro",
 };
+/** "Fija" = está en la lista publicada (3 días, 1 por partido, 5 por día), no solo candidata. */
+const FIJA_KEYS = new Set((DATA.fijas?.lista || []).map((f: any) => `${f.id}|${f.clave}`));
+export const esFija = (p: any, o: any) => (p ? FIJA_KEYS.has(`${p.id}|${o.clave}`) : !!o.fija);
 export const compName = (p: any) => (p.liga === "INT" ? COMP_ES[p.competicion] || p.competicion : LG[p.liga]?.name);
 
 export function initials(n: string) {
@@ -81,7 +89,7 @@ export function prettyAlt(p: any, l: string) {
     "Doble oportunidad 1X (local o empate)": `${p.local} o empate`, "Doble oportunidad X2 (visita o empate)": `${p.visita} o empate`,
     "Doble oportunidad 12 (no hay empate)": "Cualquiera gana (sin empate)", "Empate no apuesta: local": `${p.local} (si empata, te devuelven)`,
     "Empate no apuesta: visita": `${p.visita} (si empata, te devuelven)`, "Gana el local": `Gana ${p.local}`, "Gana la visita": `Gana ${p.visita}`,
-    "Hándicap asiático local -1": `${p.local} gana por 2 o más`, "Hándicap asiático visita -1": `${p.visita} gana por 2 o más`,
+    "Hándicap asiático local -1": `${p.local} gana por 2 o más (si gana por 1, se devuelve)`, "Hándicap asiático visita -1": `${p.visita} gana por 2 o más (si gana por 1, se devuelve)`,
     "Local gana por 2 o más": `${p.local} gana por 2 o más`, "Visita gana por 2 o más": `${p.visita} gana por 2 o más`,
     "Local no marca": `${p.local} no marca`, "Visita no marca": `${p.visita} no marca`, "Empate": "Empate",
   };
@@ -114,7 +122,7 @@ export function topPicks(n = 6): Pick[] {
   if (!pool.length) return legacyTopPicks(n);
   const best = new Map<string, { p: any; o: any }>();
   for (const x of pool) { const cur = best.get(x.p.id); if (!cur || x.o.puntaje > cur.o.puntaje) best.set(x.p.id, x); }
-  const list = [...best.values()].sort((a, b) => (b.o.fija ? 1 : 0) - (a.o.fija ? 1 : 0) || b.o.puntaje - a.o.puntaje || b.p.confianza - a.p.confianza);
+  const list = [...best.values()].sort((a, b) => (esFija(b.p, b.o) ? 1 : 0) - (esFija(a.p, a.o) ? 1 : 0) || b.o.puntaje - a.o.puntaje || b.p.confianza - a.p.confianza);
   const seen = new Set<string>(), res: Pick[] = [];
   for (const { p, o } of list) {
     const key = p.liga + p.competicion;

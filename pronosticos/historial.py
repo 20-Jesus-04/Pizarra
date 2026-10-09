@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -33,9 +34,25 @@ def load() -> dict:
     return {"version": 1, "creado": datetime.now(timezone.utc).isoformat(), "partidos": {}}
 
 
+def limpio(x):
+    """Copia apta para JSON estricto: NaN/infinito -> None, tipos de numpy -> nativos (json no llama a `default`
+    para los float de numpy porque heredan de float, así que hay que limpiarlos antes)."""
+    if isinstance(x, dict):
+        return {k: limpio(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [limpio(v) for v in x]
+    if isinstance(x, (bool, np.bool_)):
+        return bool(x)
+    if isinstance(x, (int, np.integer)):
+        return int(x)
+    if isinstance(x, (float, np.floating)):
+        return float(x) if math.isfinite(x) else None
+    return x
+
+
 def save(h: dict) -> None:
     with open(PATH, "w", encoding="utf-8") as f:
-        json.dump(h, f, ensure_ascii=False, separators=(",", ":"))
+        json.dump(limpio(h), f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
 def _t(s: str) -> datetime:
@@ -70,8 +87,10 @@ def registrar(h: dict, partidos: list, fijas: list, now: datetime) -> int:
             "mercado": {k: p["mercado"][k] for k in ("1", "X", "2")} if p.get("mercado") else None,
             "propio": p.get("modelo_puro", {}).get("1x2"),
             "xg": [mk["xg_home"], mk["xg_away"]],
-            "corners_esp": (mk.get("corners") or {}).get("esperados_total"),
-            "tarjetas_esp": (mk.get("tarjetas") or {}).get("esperadas_total"),
+            # valores esperados SIN el ajuste por resultados reales: son la base con la que se recalcula ese ajuste
+            "corners_esp": (mk.get("corners") or {}).get("esperados_base", (mk.get("corners") or {}).get("esperados_total")),
+            "tarjetas_esp": (mk.get("tarjetas") or {}).get("esperadas_base", (mk.get("tarjetas") or {}).get("esperadas_total")),
+            "neutral": bool(p.get("neutral")),
             "arbitro": (p.get("arbitro") or {}).get("nombre"),
             "principal": alt[0]["clave"] if alt and alt[0].get("clave") else None,
             "fijas": fset.get(p["id"], []),
@@ -85,16 +104,43 @@ def registrar(h: dict, partidos: list, fijas: list, now: datetime) -> int:
     return n
 
 
+MANUAL_ESPERA = timedelta(hours=24)      # un resultado manual solo se acepta 24 h después del inicio del partido
+
+
 def liquidar(h: dict, resultados: dict, now: datetime) -> int:
-    """resultados: {id: {hg, ag, hthg?, htag?, corners?, cards?}}. Liquida partidos terminados sin resultado."""
+    """resultados: {id: {hg, ag, hthg?, htag?, corners?, cards?, final?, fuente?, _anular?}}. Liquida partidos terminados.
+    Solo toca el resultado, nunca el pronóstico. Si un dato ya guardado resulta faltante (0 córners de una ficha sin
+    estadísticas, córners/tarjetas con prórroga) se anula dejando constancia en "anulados"; si el partido fue a prórroga
+    o penales y se había guardado otro marcador, se corrige al de los 90 minutos dejando el anterior en "corregido"."""
     n = 0
     for pid, rec in h["partidos"].items():
         r = resultados.get(pid)
         if not r or r.get("hg") is None or _t(rec["fecha"]) > now:
             continue
+        if r.get("manual") and now - _t(rec["fecha"]) < MANUAL_ESPERA:
+            print(f"::warning::resultado manual {pid} descartado: el partido empezó hace menos de 24 horas")
+            continue
         new = dict(rec.get("resultado") or {})
         changed = False
+        nulos = set(r.get("_anular") or [])
+        for k in nulos:
+            # se anula solo un 0 guardado (dato faltante) o cualquier valor si hubo prórroga o penales
+            if new.get(k) is not None and (new[k] == 0 or r.get("final")):
+                new.setdefault("anulados", {})[k] = new[k]
+                new[k] = None
+                changed = True
+        distinto = new.get("hg") is not None and (new["hg"], new["ag"]) != (r["hg"], r["ag"])
+        if distinto and (r.get("final") or (new.get("manual") and not r.get("manual"))):
+            # prórroga/penales liquidados con otro marcador, o resultado manual que ESPN contradice: gana ESPN
+            new.setdefault("corregido", {"hg": new["hg"], "ag": new["ag"],
+                                         **({"fuente": new["fuente"]} if new.get("manual") else {})})
+            new["hg"], new["ag"] = r["hg"], r["ag"]
+            if new.pop("manual", None):
+                new.pop("fuente", None)
+            changed = True
         for k, v in r.items():          # los córners/tarjetas de la ficha pueden llegar un día después
+            if k.startswith("_") or k in nulos:
+                continue
             if v is not None and new.get(k) is None:
                 new[k] = v
                 changed = True
@@ -177,7 +223,9 @@ def metricas(h: dict, now: datetime, lima_day) -> dict:
     for r in recs:
         oc = {k: (pr, ok) for k, pr, ok in _outcomes(r)}
         base = {"id": r["id"], "fecha": r["fecha"], "liga": r["liga"], "local": r["local"], "visita": r["visita"],
-                "marcador": f"{r['resultado']['hg']}-{r['resultado']['ag']}"}
+                "marcador": f"{r['resultado']['hg']}-{r['resultado']['ag']}",
+                **({"manual": True} if r["resultado"].get("manual") else {}),
+                **({"anulado": sorted(r["resultado"]["anulados"])} if r["resultado"].get("anulados") else {})}
         if r.get("principal") in oc:
             pr, ok = oc[r["principal"]]
             pub.append({**base, "seleccion": LABEL.get(r["principal"], r["principal"]), "prob": pr, "acierto": ok, "tipo": "principal"})

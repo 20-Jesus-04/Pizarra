@@ -1,0 +1,10 @@
+{
+  "_nota": "Resultados cargados a mano cuando ESPN borra el evento o lo deja mal. Marcador de los 90 minutos. Solo se usan si no hay otro dato; no reescriben pronósticos.",
+  "401906313": {
+    "hg": 1,
+    "ag": 1,
+    "partido": "Panamá - Nueva Zelanda, Copa Kirin 2026 (semifinal), 2026-10-01",
+    "nota": "1-1 en los 90 minutos, definido por penales. ESPN borró el evento.",
+    "fuente": "https://www.primicias.ec/deportes/futbol/panama-derrota-nueva-zelanda-penales-ecuador-copa-kirin-133856/"
+  }
+}

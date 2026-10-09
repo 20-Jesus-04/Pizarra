@@ -1,16 +1,17 @@
 # CuchiFijas
 
-Motor de pronósticos de fútbol (Premier, LaLiga, Serie A, Bundesliga, Ligue 1, Liga 1 Perú, Liga Profesional Argentina, MLS, Champions femenina y selecciones: Nations League, eliminatorias, Copa América, Eurocopa, Mundial, Copa África, amistosos) que corre solo cada día:
+Motor de pronósticos de fútbol (Premier, LaLiga, Serie A, Bundesliga, Ligue 1, Liga 1 Perú, Liga Profesional Argentina, MLS, Brasileirão Série A, Champions femenina y selecciones: Nations League, eliminatorias, Copa América, Eurocopa, Mundial, Copa África, amistosos) que corre solo cada día:
 
-1. **Datos**: resultados, estadísticas, cuotas y árbitros (football-data.co.uk), selecciones desde 2014 (martj42/international_results), Liga 1, Liga Argentina y MLS, próximos partidos, cuotas actuales, fichas de jugadores y árbitros designados (ESPN). La Champions femenina usa ESPN y sus ratings también aprenden de la WSL, la Liga F y la Première Ligue (ESPN no tiene Alemania ni Italia).
+1. **Datos**: resultados, estadísticas, cuotas y árbitros (football-data.co.uk), selecciones desde 2014 (martj42/international_results), Liga 1, Liga Argentina, MLS y Brasileirão, próximos partidos, cuotas actuales, fichas de jugadores y árbitros designados (ESPN). La Champions femenina usa ESPN y sus ratings también aprenden de la WSL, la Liga F y la Première Ligue (ESPN no tiene Alemania ni Italia).
 2. **Seis modelos independientes**: Poisson, Dixon-Coles, Elo, Bayesiano (Gamma-Poisson), consenso del mercado (cuotas sin margen) y XGBoost (forma, descanso, xG reciente, Elo…).
-3. **Ensamble**: los pesos de cada modelo se recalibran cada semana con un backtest walk-forward (cada semana se reentrena solo con el pasado) y se validan con partidos que no se usaron para elegirlos. Con cuotas, el mercado se lleva casi todo el peso (es muy difícil de superar); sin cuotas (Liga 1, Liga Argentina, MLS, selecciones, partidos lejanos) el ensamble mejora a Dixon-Coles solo.
+3. **Ensamble**: los pesos de cada modelo se recalibran cada semana con un backtest walk-forward (cada semana se reentrena solo con el pasado) y se validan con partidos que no se usaron para elegirlos. Con cuotas, el mercado se lleva casi todo el peso (es muy difícil de superar); sin cuotas (Liga 1, Liga Argentina, MLS, Brasileirão, selecciones, partidos lejanos) el ensamble mejora a Dixon-Coles solo.
 4. **Mercados**: el 1X2 y el over 2.5 del ensamble se convierten en una matriz de marcadores → más de 25 mercados + jugadores + estadísticas de equipo.
 5. **Árbitros**: las tarjetas esperadas se multiplican por el factor del árbitro (tarjetas reales / esperadas por los equipos, encogido hacia la media).
 6. **Auditor automático**: reglas que marcan cada pronóstico como ok / revisar / bloqueado.
-7. **Oportunidades y fijas**: cada pick se cruza con 5 señales (modelo, historial de ese tipo de pick, últimos 8 partidos de ambos equipos, jugadores y cuota) y recibe un puntaje 0-100. Oportunidad: las señales lo respaldan (hasta 3 por partido, cuota justa 1.30-2.60). Fija: todo confirma, a cualquier cuota. También oportunidades de jugador donde la validación de jugadores lo respalda.
-8. **Historial**: cada predicción se registra antes del partido en `data/historial.json`, se liquida después y nunca se borra. La web muestra Brier, calibración y acierto reales.
-9. `docs/index.html`: web estática con todo lo anterior (Partidos, Fijas, Resultados, Ligas, Método).
+7. **Oportunidades y fijas**: cada pick se cruza con 5 señales (modelo, historial de ese tipo de pick, últimos 8 partidos de ambos equipos, jugadores y cuota) y recibe un puntaje 0-100. El historial solo veta: si en esa celda (grupo de competición × con/sin cuota × tipo de pick × rango de probabilidad) el modelo exagera, el pick se descarta. Oportunidad: las señales lo respaldan (hasta 3 por partido, cuota justa 1.30-2.60). Fija: todo confirma, a cualquier cuota. También oportunidades de jugador donde la validación de jugadores lo respalda.
+8. **Historial**: cada predicción se registra antes del partido en `data/historial.json`, se liquida después (con el marcador de los 90 minutos) y nunca se borra. La web muestra Brier, calibración y acierto reales. Si ESPN borra un partido, el resultado se carga con su fuente en `data/resultados_manuales.json`.
+9. **Feedback** (`feedback.py`, en cada corrida): lo liquidado corrige lo siguiente. Córners y tarjetas: nivel y dispersión reales de cada grupo de competición (binomial negativa). Goles y resultado sin cuota de mercado: recalibración Platt con los picks reales. Con cuota de mercado, la curva del backtest ya está calibrada.
+10. `docs/index.html`: web estática con todo lo anterior (Partidos, Fijas, Resultados, Ligas, Método).
 
 ## Uso en tu PC
 
@@ -39,14 +40,15 @@ Si alguna fuente bloquea los servidores de GitHub, ejecútalo en tu PC con el Pr
 | `config.py` `DAYS_AHEAD`, `LEAGUES`, `INT_COMPETITIONS` | Qué partidos y ligas se muestran |
 | `ensamble.py` `MAX_AGE_DAYS` | Cada cuántos días se recalibra el ensamble (6) |
 | `arbitros.py` `REF_K`, `REF_XI` | Cuánto se encoge el factor del árbitro y su memoria |
-| `oportunidades.py` | Pesos de las 5 señales, puntaje mínimo (65) y de fija (75), rango de cuotas, topes |
+| `oportunidades.py` | Pesos de las señales, puntaje mínimo (74) y de fija (82), rango de cuotas, topes |
+| `feedback.py` | Prior de córners/tarjetas, ridge del Platt, umbrales del veto (k = 200, ratio 0.95, P 0.8, 150 partidos) |
 
 `python -m pronosticos.build --recalibrar` fuerza el backtest del ensamble (≈2-3 min).
 
 ## Archivos
 
 - `fetch.py` descarga · `data.py` limpia y une fuentes · `model.py` Dixon-Coles · `modelos.py` Poisson, Bayes, Elo, XGBoost
-- `ensamble.py` backtest, pesos, calibración y motor · `arbitros.py` · `auditor.py` · `oportunidades.py` · `historial.py` · `picks.py`
+- `ensamble.py` backtest, pesos, calibración y motor · `arbitros.py` · `auditor.py` · `oportunidades.py` · `historial.py` · `picks.py` · `feedback.py`
 - `players.py` jugadores · `markets.py` mercados · `stats.py` forma/H2H/tabla · `backtest.py` métricas
 - `build.py` pipeline completo · `web-src/` la interfaz (compilada en `web/app.html`)
 

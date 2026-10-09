@@ -102,10 +102,11 @@ export default function App() {
   useEffect(() => { if (view === "partidos") setLastLg(arg); }, [view, arg]);
   const section = view === "avisos" ? "" : view === "p" ? "partidos" : view === "liga" ? "ligas" : ["partidos", "ligas", "fijas", "resultados", "metodo"].includes(view) ? view : view === "oportunidades" ? "fijas" : view === "guia" ? "metodo" : "inicio";
 
+  const esLiga = (c: string | null): c is string => !!c && Object.prototype.hasOwnProperty.call(LG, c);
   let page, title;
-  if (view === "partidos") { page = <Matches lg={arg && LG[arg] ? arg : null} />; title = "Partidos"; }
+  if (view === "partidos") { page = <Matches lg={esLiga(arg) ? arg : null} />; title = "Partidos"; }
   else if (view === "p") { page = <Match id={arg || ""} backTo={`#partidos${lastLg ? "." + lastLg : ""}`} />; const m = BY_ID[arg || ""]; title = m ? `${m.local} vs ${m.visita}` : "Partido"; }
-  else if (view === "ligas" || view === "liga") { const c = arg && LG[arg] ? arg : "E0"; page = <Leagues code={c} />; title = LG[c]?.name; }
+  else if (view === "ligas" || view === "liga") { const c = esLiga(arg) ? arg : "E0"; page = <Leagues code={c} />; title = LG[c]?.name; }
   else if (view === "guia") { page = <Guide />; title = "Cómo usar CuchiFijas"; }
   else if (view === "fijas") { page = <Fijas key="f" />; title = "Fijas"; }
   else if (view === "oportunidades") { page = <Fijas key="o" tab="oportunidades" />; title = "Oportunidades"; }
