@@ -3,4 +3,4 @@
 # setuptools sin verificar para construirlo.
 #   uv pip compile pronosticos/requirements-avisos-build.in --python-version 3.11 \
 #     --python-platform x86_64-manylinux_2_28 --generate-hashes -o pronosticos/requirements-avisos-build.txt
-setuptools>=70.1
+setuptools>=84.2.1
